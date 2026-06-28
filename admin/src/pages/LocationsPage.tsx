@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { createLocation, getLocations, updateLocation, deleteLocation, type Location } from '../api/client';
+import { LabelModal } from '../components/LabelModal';
 
 export function LocationsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -16,6 +17,7 @@ export function LocationsPage() {
     isActive: true,
   });
   const [error, setError] = useState('');
+  const [printId, setPrintId] = useState<string | null>(null);
 
   const load = () => getLocations().then(setLocations);
   useEffect(() => { load(); }, []);
@@ -128,12 +130,17 @@ export function LocationsPage() {
                 <td><span className={`badge ${l.isActive ? 'online' : 'offline'}`}>{l.isActive ? 'Да' : 'Не'}</span></td>
                 <td>
                   <button type="button" onClick={() => handleEdit(l)}>Редактирай</button>
+                  <button type="button" onClick={() => setPrintId(l.id)}>Печат</button>
                   <button type="button" onClick={() => handleDelete(l.id)}>Изтрий</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {printId && (
+        <LabelModal type="location" id={printId} onClose={() => setPrintId(null)} />
       )}
     </div>
   );
