@@ -52,4 +52,20 @@ public class SmokeTests : IClassFixture<WebApplicationFactory<Program>>
         }
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task GetItems_RequiresAuthentication()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/items");
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetLocations_RequiresAuthentication()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/locations");
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }

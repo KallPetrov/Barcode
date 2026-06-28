@@ -22,18 +22,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     getMe()
       .then(setUser)
-      .catch(() => localStorage.removeItem('token'))
+      .catch(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const login = async (username: string, password: string) => {
-    const { token, user } = await apiLogin(username, password);
+    const { token, refreshToken, user } = await apiLogin(username, password);
     localStorage.setItem('token', token);
+    localStorage.setItem('refreshToken', refreshToken);
     setUser(user);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     setUser(null);
   };
 

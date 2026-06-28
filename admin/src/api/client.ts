@@ -13,6 +13,35 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const refreshTokenValue = localStorage.getItem('refreshToken');
+
+      if (refreshTokenValue) {
+        try {
+          const { token, refreshToken: newRefreshToken } = await refreshToken(refreshTokenValue);
+          localStorage.setItem('token', token);
+          localStorage.setItem('refreshToken', newRefreshToken);
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        }
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 export interface User {
   id: string;
   username: string;
@@ -789,5 +818,24 @@ export interface AuditLogItem {
 
 export async function getAuditLogs() {
   const { data } = await api.get<AuditLogItem[]>('/api/audit');
+  return data;
+}
+
+export async function refreshToken(token: string) {
+  const { data } = await api.post<{ token: string; refreshToken: string; user: User }>('/api/auth/refresh', { refreshToken: token });
+  return data;
+}
+
+export async function logoutApi(token: string) {
+  await api.post('/api/auth/logout', { refreshToken: token });
+}
+
+export async function getItemLabel(id: string, qty: number = 1) {
+  const { data } = await api.get<string>(`/api/labels/item/${id}?qty=${qty}`);
+  return data;
+}
+
+export async function getLocationLabel(id: string) {
+  const { data } = await api.get<string>(`/api/labels/location/${id}`);
   return data;
 }
