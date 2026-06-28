@@ -10,6 +10,7 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -74,6 +75,7 @@ builder.Services.AddScoped<KpiReportingService>();
 builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<OperatorActionHistoryService>();
 builder.Services.AddScoped<SlaService>();
+builder.Services.AddScoped<IZplService, ZplService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is required.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -121,6 +123,7 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<CALAC.Api.Hubs.WarehouseHub>("/hub/warehouse");
 
 app.Run();
 public partial class Program { }

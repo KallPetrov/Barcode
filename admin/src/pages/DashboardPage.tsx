@@ -1,15 +1,28 @@
 import { useEffect, useState } from 'react';
 import { getDashboardStats, getOperatorHistory, getSlaOverview, type DashboardStats, type OperatorActionHistoryItem, type SlaOverview } from '../api/client';
+import { warehouseHub } from '../api/signalr';
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [history, setHistory] = useState<OperatorActionHistoryItem[]>([]);
   const [sla, setSla] = useState<SlaOverview | null>(null);
 
-  useEffect(() => {
+  const loadData = () => {
     getDashboardStats().then(setStats).catch(console.error);
     getOperatorHistory().then(setHistory).catch(console.error);
     getSlaOverview().then(setSla).catch(console.error);
+  };
+
+  useEffect(() => {
+    loadData();
+    warehouseHub.start();
+    const unsubscribe = warehouseHub.onEvent((event) => {
+      console.log('Received warehouse event:', event);
+      loadData();
+    });
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   return (

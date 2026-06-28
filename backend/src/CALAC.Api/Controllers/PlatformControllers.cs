@@ -277,6 +277,35 @@ public class AuditController(AuditService auditService) : ControllerBase
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
+public class LabelsController(IZplService zpl, ItemService items, LocationService locations) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+
+    [HttpGet("item/{id:guid}")]
+    public async Task<ActionResult<string>> GetItemLabel(Guid id, [FromQuery] int qty = 1, CancellationToken ct = default)
+    {
+        var item = await items.GetAsync(TenantId, id, ct);
+        if (item == null) return NotFound();
+
+        // Manual conversion for now since we don't have a shared AutoMapper/Mapster yet
+        var domainItem = new Item { Name = item.Name, Sku = item.Sku, Barcode = item.Barcode };
+        return Ok(zpl.GenerateItemLabel(domainItem, qty));
+    }
+
+    [HttpGet("location/{id:guid}")]
+    public async Task<ActionResult<string>> GetLocationLabel(Guid id, CancellationToken ct = default)
+    {
+        var location = await locations.GetAsync(TenantId, id, ct);
+        if (location == null) return NotFound();
+
+        var domainLocation = new Location { Code = location.Code };
+        return Ok(zpl.GenerateLocationLabel(domainLocation));
+    }
+}
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
 public class LocationsController(LocationService locationService) : ControllerBase
 {
     private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);

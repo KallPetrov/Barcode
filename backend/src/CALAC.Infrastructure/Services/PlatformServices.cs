@@ -4,6 +4,7 @@ using System.Text;
 using CALAC.Domain.Entities;
 using CALAC.Domain.Enums;
 using CALAC.Infrastructure.Data;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -651,7 +652,7 @@ public record AddStockRequest(Guid ItemId, Guid LocationId, decimal Quantity, st
 public record InventorySessionDto(Guid Id, string Name, string? Description, string Status, DateTime? StartedAt, DateTime? CompletedAt, Guid? StartedByUserId, string? StartedByUserName, DateTime CreatedAt);
 public record InventoryCountDto(Guid Id, Guid SessionId, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal SystemQuantity, decimal? CountedQuantity, string? BatchNumber, string? SerialNumber, Guid? CountedByUserId, string? CountedByUserName, DateTime? CountedAt, DateTime CreatedAt);
 
-public class InventorySessionService(AppDbContext db, AuditService audit, NotificationAlertService alerts)
+public class InventorySessionService(AppDbContext db, AuditService audit, NotificationAlertService alerts, IHubContext<DynamicHubProxy> hubContext)
 {
     public async Task<IReadOnlyList<InventorySessionDto>> ListAsync(Guid tenantId, CancellationToken ct = default) =>
         await db.InventorySessions
@@ -724,6 +725,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
         await audit.LogAsync(tenantId, "SESSION_STARTED", userId, null, "InventorySession", session.Id.ToString(),
             null, null, ct);
         await alerts.CreateAsync(tenantId, "Инвентаризация стартира", $"Сесията '{session.Name}' е стартирана.", AlertLevel.Info, userId, ct);
+        await hubContext.Clients.Group(tenantId.ToString()).SendAsync("WarehouseEvent", new { type = "INVENTORY_STARTED", name = session.Name }, ct);
 
         // Generate counts based on current stock
         var stockList = await db.InventoryStocks
@@ -766,6 +768,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
         await audit.LogAsync(tenantId, "SESSION_COMPLETED", userId, null, "InventorySession", session.Id.ToString(),
             null, null, ct);
         await alerts.CreateAsync(tenantId, "Инвентаризация завършена", $"Сесията '{session.Name}' е завършена.", AlertLevel.Info, userId, ct);
+        await hubContext.Clients.Group(tenantId.ToString()).SendAsync("WarehouseEvent", new { type = "INVENTORY_COMPLETED", name = session.Name }, ct);
 
         return await GetAsync(tenantId, session.Id, ct);
     }
@@ -885,7 +888,7 @@ public record UpdatePickingLineRequest(
     Guid LineId,
     decimal PickedQuantity);
 
-public class PickingService(AppDbContext db, AuditService audit, NotificationAlertService alerts)
+public class PickingService(AppDbContext db, AuditService audit, NotificationAlertService alerts, IHubContext<DynamicHubProxy> hubContext)
 {
     public async Task<IReadOnlyList<PickingOrderDto>> ListAsync(Guid tenantId, CancellationToken ct = default)
     {
@@ -994,6 +997,7 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
 
         await audit.LogAsync(tenantId, "PICKING_ORDER_STARTED", userId, null, "PickingOrder", order.Id.ToString(), null, null, ct);
         await alerts.CreateAsync(tenantId, "Picking стартира", $"Поръчката '{order.Name}' е стартирана.", AlertLevel.Warning, userId, ct);
+        await hubContext.Clients.Group(tenantId.ToString()).SendAsync("WarehouseEvent", new { type = "PICKING_STARTED", name = order.Name }, ct);
         return await GetAsync(tenantId, order.Id, ct);
     }
 
@@ -1069,6 +1073,7 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
 
         await audit.LogAsync(tenantId, "PICKING_ORDER_COMPLETED", userId, null, "PickingOrder", order.Id.ToString(), null, null, ct);
         await alerts.CreateAsync(tenantId, "Picking завършен", $"Поръчката '{order.Name}' е завършена.", AlertLevel.Info, userId, ct);
+        await hubContext.Clients.Group(tenantId.ToString()).SendAsync("WarehouseEvent", new { type = "PICKING_COMPLETED", name = order.Name }, ct);
 
         return await GetAsync(tenantId, order.Id, ct);
     }
