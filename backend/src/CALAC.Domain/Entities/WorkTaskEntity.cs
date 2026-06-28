@@ -16,7 +16,7 @@ public enum WorkTaskPriority
     Urgent = 3
 }
 
-public class WorkTask
+public class WorkTask : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }

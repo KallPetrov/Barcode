@@ -63,7 +63,7 @@ export interface DashboardStats {
 }
 
 export async function login(username: string, password: string) {
-  const { data } = await api.post<{ token: string; user: User }>('/api/auth/login', { username, password });
+  const { data } = await api.post<{ token: string; refreshToken: string; user: User }>('/api/auth/login', { username, password });
   return data;
 }
 
@@ -771,4 +771,23 @@ export async function syncErpItems(id: string) {
 
 export async function syncErpInventory(id: string) {
   await api.put(`/api/erpconfigurations/${id}/sync-inventory`);
+}
+
+export interface AuditLogItem {
+  id: string;
+  userId?: string;
+  userName?: string;
+  deviceId?: string;
+  deviceName?: string;
+  action: string;
+  entityType?: string;
+  entityId?: string;
+  details?: string;
+  ipAddress?: string;
+  createdAt: string;
+}
+
+export async function getAuditLogs() {
+  const { data } = await api.get<AuditLogItem[]>('/api/audit');
+  return data;
 }

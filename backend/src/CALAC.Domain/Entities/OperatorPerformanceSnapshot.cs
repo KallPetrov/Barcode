@@ -1,6 +1,6 @@
 namespace CALAC.Domain.Entities;
 
-public class OperatorPerformanceSnapshot
+public class OperatorPerformanceSnapshot : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }

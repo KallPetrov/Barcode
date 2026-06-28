@@ -14,9 +14,10 @@ public class Tenant
     public ICollection<Device> Devices { get; set; } = [];
     public ICollection<Location> Locations { get; set; } = [];
     public ICollection<Item> Items { get; set; } = [];
+    public ICollection<ErpConfiguration> ErpConfigurations { get; set; } = [];
 }
 
-public class User
+public class User : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -34,7 +35,7 @@ public class User
     public ICollection<AuditLog> AuditLogs { get; set; } = [];
 }
 
-public class Device
+public class Device : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -56,7 +57,7 @@ public class Device
     public ICollection<AuditLog> AuditLogs { get; set; } = [];
 }
 
-public class AuditLog
+public class AuditLog : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -73,7 +74,7 @@ public class AuditLog
     public Device? Device { get; set; }
 }
 
-public class SyncOperation
+public class SyncOperation : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -89,7 +90,7 @@ public class SyncOperation
     public Device Device { get; set; } = null!;
 }
 
-public class Location
+public class Location : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -112,7 +113,7 @@ public class Location
     public ICollection<ErpConfiguration> ErpConfigurations { get; set; } = [];
 }
 
-public class Item
+public class Item : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -132,7 +133,7 @@ public class Item
     public ICollection<InventoryCount> InventoryCounts { get; set; } = [];
 }
 
-public class InventoryStock
+public class InventoryStock : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -159,11 +160,12 @@ public enum InventorySessionStatus
     Cancelled = 3
 }
 
-public class InventorySession
+public class InventorySession : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
     public InventorySessionStatus Status { get; set; } = InventorySessionStatus.Draft;
     public Guid? StartedByUserId { get; set; }
     public Guid? CompletedByUserId { get; set; }
@@ -178,14 +180,16 @@ public class InventorySession
     public ICollection<InventoryCount> InventoryCounts { get; set; } = [];
 }
 
-public class InventoryCount
+public class InventoryCount : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
     public Guid InventorySessionId { get; set; }
+    public Guid SessionId => InventorySessionId;
     public Guid ItemId { get; set; }
     public Guid LocationId { get; set; }
     public decimal? ExpectedQuantity { get; set; }
+    public decimal? SystemQuantity => ExpectedQuantity;
     public decimal? CountedQuantity { get; set; }
     public string? BatchNumber { get; set; }
     public string? SerialNumber { get; set; }
@@ -216,7 +220,7 @@ public enum PickingOrderStatus
     Cancelled = 3
 }
 
-public class PickingOrder
+public class PickingOrder : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -239,7 +243,7 @@ public class PickingOrder
     public ICollection<PickingOrderLine> Lines { get; set; } = [];
 }
 
-public class PickingOrderLine
+public class PickingOrderLine : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -259,7 +263,7 @@ public class PickingOrderLine
     public ICollection<PickingStockLine> StockLines { get; set; } = [];
 }
 
-public class PickingStockLine
+public class PickingStockLine : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -283,7 +287,7 @@ public enum GoodsReceiptStatus
     Cancelled = 3
 }
 
-public class GoodsReceipt
+public class GoodsReceipt : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -304,7 +308,7 @@ public class GoodsReceipt
     public ICollection<GoodsReceiptLine> Lines { get; set; } = [];
 }
 
-public class GoodsReceiptLine
+public class GoodsReceiptLine : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -333,7 +337,7 @@ public enum TransferOrderStatus
     Cancelled = 3
 }
 
-public class TransferOrder
+public class TransferOrder : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -353,7 +357,7 @@ public class TransferOrder
     public ICollection<TransferOrderLine> Lines { get; set; } = [];
 }
 
-public class TransferOrderLine
+public class TransferOrderLine : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }
@@ -382,7 +386,7 @@ public enum ErpProviderType
     Custom = 99
 }
 
-public class ErpConfiguration
+public class ErpConfiguration : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }

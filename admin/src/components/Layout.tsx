@@ -27,6 +27,7 @@ export function Layout() {
           <NavLink to="/work-tasks">Операторски задачи</NavLink>
           <NavLink to="/operator-performance">Отчети</NavLink>
           <NavLink to="/alerts">Известия</NavLink>
+          <NavLink to="/audit-log">Одит лог</NavLink>
           {user?.role === 'Admin' && <NavLink to="/erp-configurations">ERP Конфигурации</NavLink>}
           {user?.role === 'Admin' && <NavLink to="/users">Потребители</NavLink>}
         </nav>
