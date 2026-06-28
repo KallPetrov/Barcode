@@ -4,6 +4,7 @@ using System.Text;
 using CALAC.Domain.Entities;
 using CALAC.Domain.Enums;
 using CALAC.Infrastructure.Data;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -302,7 +303,7 @@ public record RegisterDeviceRequest(
     int? BatteryLevel);
 
 public record SyncPushRequest(IReadOnlyList<SyncOperationItem> Operations);
-public record SyncOperationItem(string ClientOperationId, string OperationType, string PayloadJson);
+public record SyncOperationItem(string ClientOperationId, string OperationType, string PayloadJson, DateTime? ClientTimestamp, int? Version);
 public record SyncPushResultItem(string ClientOperationId, bool Success, string? ErrorMessage);
 public record SyncPushResponse(IReadOnlyList<SyncPushResultItem> Results);
 
@@ -336,6 +337,8 @@ public class SyncService(AppDbContext db, AuditService audit)
                 ClientOperationId = op.ClientOperationId,
                 OperationType = op.OperationType,
                 PayloadJson = op.PayloadJson,
+                ClientTimestamp = op.ClientTimestamp,
+                Version = op.Version ?? 1,
                 Status = SyncOperationStatus.Completed,
                 ProcessedAt = DateTime.UtcNow
             };
@@ -502,13 +505,14 @@ public class ItemService(AppDbContext db, AuditService audit)
 
     public async Task<ItemDto?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken ct = default)
     {
-        var item = await db.Items.FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Barcode == barcode, ct);
+        var item = await db.Items.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Barcode == barcode, ct);
         return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.IsActive, item.CreatedAt);
     }
 
     public async Task<ItemDto> CreateAsync(Guid tenantId, CreateItemRequest request, Guid userId, CancellationToken ct = default)
     {
-        if (await db.Items.AnyAsync(i => i.TenantId == tenantId && i.Sku == request.Sku, ct))
+        // Use IgnoreQueryFilters because we might be calling this from a webhook without a logged-in user
+        if (await db.Items.IgnoreQueryFilters().AnyAsync(i => i.TenantId == tenantId && i.Sku == request.Sku, ct))
             throw new InvalidOperationException("SKU вече съществува");
 
         var item = new Item
@@ -595,18 +599,18 @@ public class InventoryService(AppDbContext db, AuditService audit)
         if (request.Quantity <= 0)
             throw new InvalidOperationException("Количество трябва да бъде по-голямо от 0");
 
-        var item = await db.Items.FirstOrDefaultAsync(i => i.Id == request.ItemId && i.TenantId == tenantId, ct);
+        var item = await db.Items.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.Id == request.ItemId && i.TenantId == tenantId, ct);
         if (item is null)
             throw new KeyNotFoundException("Артикулът не е намерен");
 
-        var location = await db.Locations.FirstOrDefaultAsync(l => l.Id == request.LocationId && l.TenantId == tenantId, ct);
+        var location = await db.Locations.IgnoreQueryFilters().FirstOrDefaultAsync(l => l.Id == request.LocationId && l.TenantId == tenantId, ct);
         if (location is null)
             throw new KeyNotFoundException("Локацията не е намерена");
 
         var batchNumber = string.IsNullOrWhiteSpace(request.BatchNumber) ? null : request.BatchNumber.Trim();
         var serialNumber = string.IsNullOrWhiteSpace(request.SerialNumber) ? null : request.SerialNumber.Trim();
 
-        var existingStock = await db.InventoryStocks.FirstOrDefaultAsync(s =>
+        var existingStock = await db.InventoryStocks.IgnoreQueryFilters().FirstOrDefaultAsync(s =>
             s.TenantId == tenantId &&
             s.ItemId == request.ItemId &&
             s.LocationId == request.LocationId &&
@@ -1718,8 +1722,10 @@ public record UpdateErpConfigRequest(
     bool AutoSyncInventory,
     string? SettingsJson);
 
-public class ErpConfigurationService(AppDbContext db, AuditService audit)
+public class ErpConfigurationService(AppDbContext db, AuditService audit, IDataProtectionProvider dataProtection)
 {
+    private readonly IDataProtector _protector = dataProtection.CreateProtector("ERP_Secrets");
+
     public async Task<IReadOnlyList<ErpConfigurationDto>> ListAsync(Guid tenantId, CancellationToken ct = default)
     {
         return await db.ErpConfigurations
@@ -1772,9 +1778,9 @@ public class ErpConfigurationService(AppDbContext db, AuditService audit)
             Name = request.Name,
             ProviderType = providerType,
             ApiUrl = request.ApiUrl,
-            ApiKey = request.ApiKey,
+            ApiKey = string.IsNullOrEmpty(request.ApiKey) ? null : _protector.Protect(request.ApiKey),
             Username = request.Username,
-            Password = request.Password,
+            Password = string.IsNullOrEmpty(request.Password) ? null : _protector.Protect(request.Password),
             DatabaseName = request.DatabaseName,
             IsActive = true,
             AutoSyncItems = request.AutoSyncItems,
@@ -1803,9 +1809,9 @@ public class ErpConfigurationService(AppDbContext db, AuditService audit)
         config.Name = request.Name;
         config.ProviderType = providerType;
         config.ApiUrl = request.ApiUrl;
-        config.ApiKey = request.ApiKey;
+        config.ApiKey = string.IsNullOrEmpty(request.ApiKey) ? null : _protector.Protect(request.ApiKey);
         config.Username = request.Username;
-        config.Password = request.Password;
+        config.Password = string.IsNullOrEmpty(request.Password) ? null : _protector.Protect(request.Password);
         config.DatabaseName = request.DatabaseName;
         config.IsActive = request.IsActive;
         config.AutoSyncItems = request.AutoSyncItems;

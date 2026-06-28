@@ -68,4 +68,12 @@ public class SmokeTests : IClassFixture<WebApplicationFactory<Program>>
         var response = await client.GetAsync("/api/locations");
         Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task ErpWebhook_WithInvalidTenant_ReturnsUnauthorized()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/webhooks/erp", new { Type = "ITEM_UPDATE", Sku = "TEST", TenantId = Guid.NewGuid() });
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }
