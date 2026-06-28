@@ -1,0 +1,43 @@
+:root {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1a1a2e;
+  background: #f0f2f5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { min-height: 100vh; }
+
+button, input, select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  background: #2563eb;
+  color: white;
+}
+
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+input, select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin-top: 0.35rem;
+}
+
+code {
+  font-size: 0.85em;
+  background: #f3f4f6;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}

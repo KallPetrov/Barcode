@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/txtUser"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Оператор"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/txtDeviceId"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="ID:"
+        android:textSize="14sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#E8F5E9"
+        android:padding="16dp"
+        android:text="Сканирайте баркод с хардуерния скенер"
+        android:textSize="18sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Последно сканиране:"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/txtLastScan"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        android:text="—"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/txtPending"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Чакащи операции: 0"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/txtSyncStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Статус: Готово за синхронизация"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/btnSync"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="20dp"
+        android:text="Синхронизирай"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/btnLogout"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="12dp"
+        android:text="Изход"
+        android:textSize="16sp" />
+</LinearLayout>

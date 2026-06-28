@@ -1,0 +1,29 @@
+using CALAC.Domain.Entities;
+using CALAC.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace CALAC.Infrastructure.Services;
+
+public class KpiReportingService(AppDbContext db)
+{
+    public async Task<object> GetOverviewAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var workTasks = await db.WorkTasks.Where(x => x.TenantId == tenantId).ToListAsync(ct);
+        var sessions = await db.InventorySessions.Where(x => x.TenantId == tenantId).ToListAsync(ct);
+        var picks = await db.PickingOrders.Where(x => x.TenantId == tenantId).ToListAsync(ct);
+
+        return new
+        {
+            totalTasks = workTasks.Count,
+            completedTasks = workTasks.Count(x => x.Status == WorkTaskStatus.Completed),
+            overdueTasks = workTasks.Count(x => x.Status != WorkTaskStatus.Completed && x.DueDate < DateTime.UtcNow),
+            activeSessions = sessions.Count(x => x.Status == InventorySessionStatus.InProgress),
+            completedSessions = sessions.Count(x => x.Status == InventorySessionStatus.Completed),
+            completedPickings = picks.Count(x => x.Status == PickingOrderStatus.Completed),
+            averageCompletionDays = workTasks.Where(x => x.Status == WorkTaskStatus.Completed && x.CompletedAt.HasValue)
+                .Select(x => (x.CompletedAt!.Value - x.CreatedAt).Days)
+                .DefaultIfEmpty(0)
+                .Average()
+        };
+    }
+}
