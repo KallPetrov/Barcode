@@ -2,12 +2,25 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using CALAC.Infrastructure.Data;
 using CALAC.Infrastructure.Services;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddPrometheusExporter();
+
+        metrics.ConfigureResource(resource => resource.AddService("CALAC.Api"));
+    });
 
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
@@ -124,6 +137,7 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
 app.MapHub<CALAC.Api.Hubs.WarehouseHub>("/hub/warehouse");
 
 app.Run();

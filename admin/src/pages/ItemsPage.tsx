@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { createItem, getItems, updateItem, deleteItem, type Item } from '../api/client';
+import { LabelModal } from '../components/LabelModal';
 
 export function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -17,6 +18,7 @@ export function ItemsPage() {
     isActive: true,
   });
   const [error, setError] = useState('');
+  const [printId, setPrintId] = useState<string | null>(null);
 
   const load = () => getItems().then(setItems);
   useEffect(() => { load(); }, []);
@@ -151,12 +153,17 @@ export function ItemsPage() {
                 <td><span className={`badge ${i.isActive ? 'online' : 'offline'}`}>{i.isActive ? 'Да' : 'Не'}</span></td>
                 <td>
                   <button type="button" onClick={() => handleEdit(i)}>Редактирай</button>
+                  <button type="button" onClick={() => setPrintId(i.id)}>Печат</button>
                   <button type="button" onClick={() => handleDelete(i.id)}>Изтрий</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {printId && (
+        <LabelModal type="item" id={printId} onClose={() => setPrintId(null)} />
       )}
     </div>
   );
