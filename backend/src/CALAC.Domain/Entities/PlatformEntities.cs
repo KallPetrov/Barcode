@@ -86,6 +86,8 @@ public class SyncOperation : ITenantEntity
     public string? ErrorMessage { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ProcessedAt { get; set; }
+    public DateTime? ClientTimestamp { get; set; }
+    public int Version { get; set; }
 
     public Device Device { get; set; } = null!;
 }

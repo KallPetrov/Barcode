@@ -190,6 +190,43 @@ public class UsersController(UserManagementService users) : ControllerBase
 }
 
 [ApiController]
+[Route("api/webhooks/erp")]
+public class ErpWebhooksController(ItemService items, InventoryService inventory, AppDbContext db) : ControllerBase
+{
+    public record WebhookPayload(string Type, string Sku, string? Name, string? Barcode, decimal? Quantity, string? LocationCode, Guid TenantId);
+
+    [HttpPost]
+    [AllowAnonymous] // In production, this should be secured with a signature or a secret token in header
+    public async Task<IActionResult> Receive([FromBody] WebhookPayload payload, CancellationToken ct)
+    {
+        // Simple authentication check for demo purposes
+        var tenant = await db.Tenants.FindAsync([payload.TenantId], ct);
+        if (tenant == null) return Unauthorized();
+
+        if (payload.Type == "ITEM_UPDATE")
+        {
+            var existing = await items.GetByBarcodeAsync(payload.TenantId, payload.Barcode ?? payload.Sku, ct);
+            if (existing == null)
+            {
+                await items.CreateAsync(payload.TenantId, new CreateItemRequest(payload.Sku, payload.Name ?? payload.Sku, null, payload.Barcode, null, null, null, null), Guid.Empty, ct);
+            }
+        }
+        else if (payload.Type == "STOCK_UPDATE" && payload.Quantity.HasValue && !string.IsNullOrEmpty(payload.LocationCode))
+        {
+             var item = await items.GetByBarcodeAsync(payload.TenantId, payload.Barcode ?? payload.Sku, ct);
+             var location = (await db.Locations.IgnoreQueryFilters().FirstOrDefaultAsync(l => l.TenantId == payload.TenantId && l.Code == payload.LocationCode, ct));
+
+             if (item != null && location != null)
+             {
+                 await inventory.AddStockAsync(payload.TenantId, new AddStockRequest(item.Id, location.Id, payload.Quantity.Value, null, null, null), Guid.Empty, ct);
+             }
+        }
+
+        return Ok(new { status = "processed" });
+    }
+}
+
+[ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin,Supervisor")]
 public class DashboardController(DeviceService devices, WorkTaskService workTasks, NotificationAlertService alerts, AppDbContext db) : ControllerBase
