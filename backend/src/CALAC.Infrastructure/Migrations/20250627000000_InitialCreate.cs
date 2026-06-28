@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace BarcodePlatform.Infrastructure.Migrations
+namespace CALAC.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

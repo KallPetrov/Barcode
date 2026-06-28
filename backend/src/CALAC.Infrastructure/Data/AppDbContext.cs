@@ -1,10 +1,12 @@
+using System.Linq.Expressions;
 using CALAC.Domain.Entities;
 using CALAC.Domain.Enums;
+using CALAC.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace CALAC.Infrastructure.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService? tenantService = null) : DbContext(options)
 {
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
@@ -28,9 +30,42 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<OperatorPerformanceSnapshot> OperatorPerformanceSnapshots => Set<OperatorPerformanceSnapshot>();
     public DbSet<NotificationAlert> NotificationAlerts => Set<NotificationAlert>();
     public DbSet<Reminder> Reminders => Set<Reminder>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    public virtual Guid? CurrentTenantId => tenantService?.GetTenantId();
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var entry in ChangeTracker.Entries<ITenantEntity>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                if (CurrentTenantId.HasValue)
+                {
+                    entry.Entity.TenantId = CurrentTenantId.Value;
+                }
+            }
+        }
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void SetTenantFilter<T>(ModelBuilder modelBuilder) where T : class, ITenantEntity
+    {
+        modelBuilder.Entity<T>().HasQueryFilter(e => CurrentTenantId == null || e.TenantId == CurrentTenantId);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var method = typeof(AppDbContext).GetMethod(nameof(SetTenantFilter), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                    .MakeGenericMethod(entityType.ClrType);
+                method.Invoke(this, [modelBuilder]);
+            }
+        }
+
         modelBuilder.Entity<Tenant>(e =>
         {
             e.HasKey(x => x.Id);
@@ -291,6 +326,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Message).HasMaxLength(1000);
             e.Property(x => x.RelatedEntityType).HasMaxLength(100);
             e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId);
+        });
+
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Token).IsUnique();
+            e.Property(x => x.Token).HasMaxLength(200);
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId);
         });
     }

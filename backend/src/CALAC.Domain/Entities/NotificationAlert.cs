@@ -7,7 +7,7 @@ public enum AlertLevel
     Critical = 2
 }
 
-public class NotificationAlert
+public class NotificationAlert : ITenantEntity
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }

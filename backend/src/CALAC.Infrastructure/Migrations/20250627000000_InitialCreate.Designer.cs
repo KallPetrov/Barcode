@@ -1,11 +1,11 @@
-using BarcodePlatform.Infrastructure.Data;
+using CALAC.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace BarcodePlatform.Infrastructure.Migrations
+namespace CALAC.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20250627000000_InitialCreate")]

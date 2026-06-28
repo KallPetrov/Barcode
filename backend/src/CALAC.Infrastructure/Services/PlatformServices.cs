@@ -10,7 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace CALAC.Infrastructure.Services;
 
-public record AuthResult(bool Success, string? Token, UserDto? User, string? Error);
+public record AuthResult(bool Success, string? Token, string? RefreshToken, UserDto? User, string? Error);
 
 public record UserDto(Guid Id, string Username, string FullName, UserRole Role, Guid TenantId, string TenantName);
 
@@ -23,13 +23,15 @@ public class AuthService(AppDbContext db, IConfiguration config)
             .FirstOrDefaultAsync(u => u.Username == username && u.IsActive, ct);
 
         if (user is null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-            return new AuthResult(false, null, null, "Невалидно потребителско име или парола");
+            return new AuthResult(false, null, null, null, "Невалидно потребителско име или парола");
 
         user.LastLoginAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
         var dto = ToDto(user);
-        return new AuthResult(true, GenerateToken(user), dto, null);
+        var token = GenerateToken(user);
+        var refreshToken = await GenerateRefreshTokenAsync(user.Id, ct);
+        return new AuthResult(true, token, refreshToken, dto, null);
     }
 
     public async Task<AuthResult> LoginWithPinAsync(string username, string pin, CancellationToken ct = default)
@@ -39,12 +41,39 @@ public class AuthService(AppDbContext db, IConfiguration config)
             .FirstOrDefaultAsync(u => u.Username == username && u.IsActive, ct);
 
         if (user is null || user.PinHash is null || !BCrypt.Net.BCrypt.Verify(pin, user.PinHash))
-            return new AuthResult(false, null, null, "Невалиден PIN код");
+            return new AuthResult(false, null, null, null, "Невалиден PIN код");
 
         user.LastLoginAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return new AuthResult(true, GenerateToken(user), ToDto(user), null);
+        var token = GenerateToken(user);
+        var refreshToken = await GenerateRefreshTokenAsync(user.Id, ct);
+        return new AuthResult(true, token, refreshToken, ToDto(user), null);
+    }
+
+    public async Task<AuthResult> RefreshTokenAsync(string token, CancellationToken ct = default)
+    {
+        var refreshToken = await db.RefreshTokens
+            .Include(r => r.User).ThenInclude(u => u.Tenant)
+            .FirstOrDefaultAsync(r => r.Token == token, ct);
+
+        if (refreshToken is null || !refreshToken.IsActive)
+            return new AuthResult(false, null, null, null, "Невалиден refresh token");
+
+        var newRefreshToken = await RotateRefreshTokenAsync(refreshToken, ct);
+        var jwtToken = GenerateToken(refreshToken.User);
+
+        return new AuthResult(true, jwtToken, newRefreshToken, ToDto(refreshToken.User), null);
+    }
+
+    public async Task RevokeTokenAsync(string token, CancellationToken ct = default)
+    {
+        var refreshToken = await db.RefreshTokens.FirstOrDefaultAsync(r => r.Token == token, ct);
+        if (refreshToken is not null && refreshToken.IsActive)
+        {
+            refreshToken.RevokedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     public string GenerateToken(User user)
@@ -72,12 +101,80 @@ public class AuthService(AppDbContext db, IConfiguration config)
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    private async Task<string> GenerateRefreshTokenAsync(Guid userId, CancellationToken ct = default)
+    {
+        var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        var refreshToken = new RefreshToken
+        {
+            UserId = userId,
+            Token = token,
+            ExpiresAt = DateTime.UtcNow.AddDays(7)
+        };
+
+        db.RefreshTokens.Add(refreshToken);
+        await db.SaveChangesAsync(ct);
+        return token;
+    }
+
+    private async Task<string> RotateRefreshTokenAsync(RefreshToken oldToken, CancellationToken ct = default)
+    {
+        var newToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        var refreshToken = new RefreshToken
+        {
+            UserId = oldToken.UserId,
+            Token = newToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(7)
+        };
+
+        oldToken.RevokedAt = DateTime.UtcNow;
+        oldToken.ReplacedByToken = newToken;
+
+        db.RefreshTokens.Add(refreshToken);
+        await db.SaveChangesAsync(ct);
+        return newToken;
+    }
+
     private static UserDto ToDto(User user) =>
         new(user.Id, user.Username, user.FullName, user.Role, user.TenantId, user.Tenant.Name);
 }
 
+public record AuditLogDto(
+    Guid Id,
+    Guid? UserId,
+    string? UserName,
+    Guid? DeviceId,
+    string? DeviceName,
+    string Action,
+    string? EntityType,
+    string? EntityId,
+    string? Details,
+    string? IpAddress,
+    DateTime CreatedAt);
+
 public class AuditService(AppDbContext db)
 {
+    public async Task<IReadOnlyList<AuditLogDto>> ListAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        return await db.AuditLogs
+            .Include(a => a.User)
+            .Include(a => a.Device)
+            .Where(a => a.TenantId == tenantId)
+            .OrderByDescending(a => a.CreatedAt)
+            .Select(a => new AuditLogDto(
+                a.Id,
+                a.UserId,
+                a.User != null ? a.User.FullName : null,
+                a.DeviceId,
+                a.Device != null ? a.Device.Name : null,
+                a.Action,
+                a.EntityType,
+                a.EntityId,
+                a.Details,
+                a.IpAddress,
+                a.CreatedAt))
+            .ToListAsync(ct);
+    }
+
     public async Task LogAsync(
         Guid tenantId,
         string action,
@@ -565,7 +662,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
                 s.Id,
                 s.Name,
                 s.Description,
-                s.Status,
+                s.Status.ToString(),
                 s.StartedAt,
                 s.CompletedAt,
                 s.StartedByUserId,
@@ -585,7 +682,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
             session.Id,
             session.Name,
             session.Description,
-            session.Status,
+            session.Status.ToString(),
             session.StartedAt,
             session.CompletedAt,
             session.StartedByUserId,
@@ -600,7 +697,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
             TenantId = tenantId,
             Name = request.Name,
             Description = request.Description,
-            Status = "Draft"
+            Status = InventorySessionStatus.Draft
         };
 
         db.InventorySessions.Add(session);
@@ -616,10 +713,10 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
         var session = await db.InventorySessions.FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId, ct);
         if (session is null)
             throw new KeyNotFoundException("Сесията не е намерена");
-        if (session.Status != "Draft")
+        if (session.Status != InventorySessionStatus.Draft)
             throw new InvalidOperationException("Само сесии в статус Draft могат да бъдат започнати");
 
-        session.Status = "InProgress";
+        session.Status = InventorySessionStatus.InProgress;
         session.StartedAt = DateTime.UtcNow;
         session.StartedByUserId = userId;
 
@@ -640,10 +737,10 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
             var count = new InventoryCount
             {
                 TenantId = tenantId,
-                SessionId = session.Id,
+                InventorySessionId = session.Id,
                 ItemId = stock.ItemId,
                 LocationId = stock.LocationId,
-                SystemQuantity = stock.Quantity,
+                ExpectedQuantity = stock.Quantity,
                 BatchNumber = stock.BatchNumber,
                 SerialNumber = stock.SerialNumber
             };
@@ -659,10 +756,10 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
         var session = await db.InventorySessions.FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId, ct);
         if (session is null)
             throw new KeyNotFoundException("Сесията не е намерена");
-        if (session.Status != "InProgress")
+        if (session.Status != InventorySessionStatus.InProgress)
             throw new InvalidOperationException("Само сесии в статус InProgress могат да бъдат завършени");
 
-        session.Status = "Completed";
+        session.Status = InventorySessionStatus.Completed;
         session.CompletedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -678,16 +775,16 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
             .Include(c => c.Item)
             .Include(c => c.Location)
             .Include(c => c.CountedByUser)
-            .Where(c => c.TenantId == tenantId && c.SessionId == sessionId)
+            .Where(c => c.TenantId == tenantId && c.InventorySessionId == sessionId)
             .OrderBy(c => c.Item.Name)
             .Select(c => new InventoryCountDto(
                 c.Id,
-                c.SessionId,
+                c.InventorySessionId,
                 c.ItemId,
                 c.Item.Name,
                 c.LocationId,
                 c.Location.Name,
-                c.SystemQuantity,
+                c.ExpectedQuantity ?? 0,
                 c.CountedQuantity,
                 c.BatchNumber,
                 c.SerialNumber,
@@ -706,8 +803,8 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
         if (count is null)
             throw new KeyNotFoundException("Броенето не е намерено");
 
-        var session = await db.InventorySessions.FirstOrDefaultAsync(s => s.Id == count.SessionId && s.TenantId == tenantId, ct);
-        if (session?.Status != "InProgress")
+        var session = await db.InventorySessions.FirstOrDefaultAsync(s => s.Id == count.InventorySessionId && s.TenantId == tenantId, ct);
+        if (session?.Status != InventorySessionStatus.InProgress)
             throw new InvalidOperationException("Може да се редактират само броения от сесии в статус InProgress");
 
         count.CountedQuantity = request.CountedQuantity;
@@ -718,7 +815,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
         await audit.LogAsync(tenantId, "COUNT_UPDATED", userId, null, "InventoryCount", count.Id.ToString(),
             $"ItemId={count.ItemId}, CountedQuantity={request.CountedQuantity}", null, ct);
 
-        return await ListCountsAsync(tenantId, count.SessionId, ct).ContinueWith(t => t.Result.First(c => c.Id == id), ct);
+        return await ListCountsAsync(tenantId, count.InventorySessionId, ct).ContinueWith(t => t.Result.First(c => c.Id == id), ct);
     }
 }
 

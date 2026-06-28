@@ -15,7 +15,8 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
 {
     public record LoginRequest(string Username, string Password);
     public record PinLoginRequest(string Username, string Pin);
-    public record LoginResponse(string Token, UserDto User);
+    public record RefreshTokenRequest(string RefreshToken);
+    public record LoginResponse(string Token, string RefreshToken, UserDto User);
 
     [HttpPost("login")]
     [AllowAnonymous]
@@ -28,7 +29,7 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
         await audit.LogAsync(result.User!.TenantId, "LOGIN", result.User.Id, null, "User", result.User.Id.ToString(),
             null, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
 
-        return Ok(new LoginResponse(result.Token!, result.User));
+        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User));
     }
 
     [HttpPost("login/pin")]
@@ -42,7 +43,26 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
         await audit.LogAsync(result.User!.TenantId, "LOGIN_PIN", result.User.Id, null, "User", result.User.Id.ToString(),
             null, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
 
-        return Ok(new LoginResponse(result.Token!, result.User));
+        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User));
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> Refresh([FromBody] RefreshTokenRequest request, CancellationToken ct)
+    {
+        var result = await auth.RefreshTokenAsync(request.RefreshToken, ct);
+        if (!result.Success)
+            return Unauthorized(new { error = result.Error });
+
+        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User!));
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request, CancellationToken ct)
+    {
+        await auth.RevokeTokenAsync(request.RefreshToken, ct);
+        return NoContent();
     }
 
     [HttpGet("me")]
@@ -240,6 +260,18 @@ public class HealthController : ControllerBase
     [HttpGet]
     [AllowAnonymous]
     public IActionResult Get() => Ok(new { status = "healthy", service = "CALAC.Api" });
+}
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize(Roles = "Admin,Supervisor")]
+public class AuditController(AuditService auditService) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<AuditLogDto>>> List(CancellationToken ct)
+        => Ok(await auditService.ListAsync(TenantId, ct));
 }
 
 [ApiController]
