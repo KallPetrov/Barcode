@@ -393,6 +393,25 @@ public class SyncService(AppDbContext db, AuditService audit, InventoryService i
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (stockRequest != null)
                 {
+                    // Check for version conflict if version is specified
+                    var existingStock = await db.InventoryStocks.IgnoreQueryFilters().FirstOrDefaultAsync(s =>
+                        s.TenantId == tenantId &&
+                        s.ItemId == stockRequest.ItemId &&
+                        s.LocationId == stockRequest.LocationId &&
+                        s.BatchNumber == stockRequest.BatchNumber &&
+                        s.SerialNumber == stockRequest.SerialNumber, ct);
+
+                    if (existingStock != null && op.Version > 0 && op.Version <= existingStock.Version)
+                    {
+                        // Conflict detected: client version is older than or equal to server version
+                        // Last-Write-Wins strategy using ClientTimestamp if available
+                        if (op.ClientTimestamp.HasValue && existingStock.UpdatedAt.HasValue && op.ClientTimestamp.Value < existingStock.UpdatedAt.Value)
+                        {
+                             // Skip processing as server has newer data
+                             return;
+                        }
+                    }
+
                     await inventory.AddStockAsync(tenantId, stockRequest, userId ?? Guid.Empty, ct);
                 }
                 break;
@@ -668,9 +687,13 @@ public class InventoryService(AppDbContext db, AuditService audit)
 
         if (existingStock is not null)
         {
+            // Simple version conflict check for Sync if version is provided in a more advanced request
+            // For standard AddStock, we just increment.
             existingStock.Quantity += request.Quantity;
             existingStock.UpdatedAt = DateTime.UtcNow;
             existingStock.ExpiryDate ??= request.ExpiryDate;
+            existingStock.Version++;
+
             await db.SaveChangesAsync(ct);
             await audit.LogAsync(tenantId, "STOCK_UPDATED", userId, null, "InventoryStock", existingStock.Id.ToString(),
                 $"ItemId={existingStock.ItemId}, LocationId={existingStock.LocationId}, Quantity={existingStock.Quantity}", null, ct);

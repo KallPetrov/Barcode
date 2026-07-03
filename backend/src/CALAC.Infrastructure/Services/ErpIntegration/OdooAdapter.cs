@@ -26,8 +26,13 @@ public class OdooAdapter(AppDbContext db, ErpConfiguration config) : IErpAdapter
     public async Task SyncItemsAsync(CancellationToken ct = default)
     {
         // TODO: Implement actual Odoo items sync
-        // This would fetch products from Odoo and sync to local Items table
+        // 1. Fetch products from Odoo API
+        // 2. Map Odoo products to CALAC Items
+        // 3. Upsert into database
         await Task.Delay(100, ct);
+
+        // Mocking some sync activity
+        var logger = new List<string> { "Fetching products from Odoo...", "Found 10 new products.", "Syncing SKU-OD-101...", "Sync complete." };
     }
 
     public async Task SyncInventoryAsync(CancellationToken ct = default)

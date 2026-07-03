@@ -458,6 +458,9 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ItemId");
@@ -569,6 +572,9 @@ namespace CALAC.Infrastructure.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Zone")
                         .HasMaxLength(100)
