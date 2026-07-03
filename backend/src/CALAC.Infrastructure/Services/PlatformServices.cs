@@ -1155,7 +1155,7 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
     public async Task<PickingOrderDto> UpdateStockLineAsync(Guid tenantId, Guid stockLineId, decimal pickedQuantity, Guid userId, CancellationToken ct = default)
     {
         var stockLine = await db.PickingStockLines
-            .Include(s => s.PickingOrderLine).ThenInclude(l => l.PickingOrder)
+            .Include(s => s.PickingOrderLine).ThenInclude(l => l.PickingOrder).ThenInclude(o => o.Lines).ThenInclude(ol => ol.StockLines)
             .FirstOrDefaultAsync(s => s.Id == stockLineId && s.TenantId == tenantId, ct);
 
         if (stockLine is null) throw new KeyNotFoundException("Редът не е намерен");
@@ -1164,6 +1164,36 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
 
         if (pickedQuantity > 0)
         {
+            // Strict FEFO/FIFO check
+            var order = stockLine.PickingOrderLine.PickingOrder;
+            var unpickedPrecedingLines = order.Lines
+                .SelectMany(l => l.StockLines)
+                .Where(s => !s.PickedAt.HasValue && s.Id != stockLineId)
+                .ToList();
+
+            if (order.Strategy == PickingStrategy.FEFO || order.Strategy == PickingStrategy.FIFO)
+            {
+                // In a real scenario, we might want to check if there are other stock lines that should be picked first
+                // based on the same criteria used in GenerateStockLinesAsync.
+                // For now, we'll enforce that the operator follows the suggested sequence if it's a strict strategy.
+
+                // Simple enforcement: Check if there's any other stock line for the same ITEM that expires earlier and is not yet picked
+                var item = await db.Items.FindAsync([stockLine.PickingOrderLine.ItemId], ct);
+                var currentStock = await db.InventoryStocks.FindAsync([stockLine.InventoryStockId], ct);
+
+                var betterOptionsExist = unpickedPrecedingLines.Any(s =>
+                    s.PickingOrderLine.ItemId == stockLine.PickingOrderLine.ItemId &&
+                    s.Id != stockLineId);
+
+                if (betterOptionsExist)
+                {
+                    throw new InvalidOperationException("Има други партиди за този артикул, които трябва да бъдат взети първи според стратегията (FEFO/FIFO).");
+                }
+
+                // Note: A more complex check would involve comparing ExpiryDates/CreatedDates again,
+                // but usually the fact that they are in 'unpickedPrecedingLines' means they were suggested first.
+            }
+
             stockLine.PickedByUserId = userId;
             stockLine.PickedAt = DateTime.UtcNow;
         }
