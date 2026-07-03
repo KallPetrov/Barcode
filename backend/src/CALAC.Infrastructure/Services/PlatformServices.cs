@@ -42,10 +42,27 @@ public class AuthService(AppDbContext db, IConfiguration config)
             .Include(u => u.Tenant)
             .FirstOrDefaultAsync(u => u.Username == username && u.IsActive, ct);
 
-        if (user is null || user.PinHash is null || !BCrypt.Net.BCrypt.Verify(pin, user.PinHash))
+        if (user is null)
+            return new AuthResult(false, null, null, null, "Невалидно потребителско име");
+
+        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
+            return new AuthResult(false, null, null, null, $"Акаунтът е блокиран до {user.LockoutEnd.Value.ToLocalTime():HH:mm:ss}");
+
+        if (user.PinHash is null || !BCrypt.Net.BCrypt.Verify(pin, user.PinHash))
+        {
+            user.AccessFailedCount++;
+            if (user.AccessFailedCount >= 5)
+            {
+                user.LockoutEnd = DateTimeOffset.UtcNow.AddMinutes(15);
+                user.AccessFailedCount = 0;
+            }
+            await db.SaveChangesAsync(ct);
             return new AuthResult(false, null, null, null, "Невалиден PIN код");
+        }
 
         user.LastLoginAt = DateTime.UtcNow;
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
         await db.SaveChangesAsync(ct);
 
         var token = GenerateToken(user);
@@ -307,7 +324,7 @@ public record SyncOperationItem(string ClientOperationId, string OperationType, 
 public record SyncPushResultItem(string ClientOperationId, bool Success, string? ErrorMessage);
 public record SyncPushResponse(IReadOnlyList<SyncPushResultItem> Results);
 
-public class SyncService(AppDbContext db, AuditService audit)
+public class SyncService(AppDbContext db, AuditService audit, InventoryService inventory)
 {
     public async Task<SyncPushResponse> PushAsync(
         Guid tenantId,
@@ -339,12 +356,25 @@ public class SyncService(AppDbContext db, AuditService audit)
                 PayloadJson = op.PayloadJson,
                 ClientTimestamp = op.ClientTimestamp,
                 Version = op.Version ?? 1,
-                Status = SyncOperationStatus.Completed,
-                ProcessedAt = DateTime.UtcNow
+                Status = SyncOperationStatus.Pending,
+                CreatedAt = DateTime.UtcNow
             };
 
+            try
+            {
+                await ProcessOperationAsync(tenantId, userId, syncOp, ct);
+                syncOp.Status = SyncOperationStatus.Completed;
+                syncOp.ProcessedAt = DateTime.UtcNow;
+                results.Add(new SyncPushResultItem(op.ClientOperationId, true, null));
+            }
+            catch (Exception ex)
+            {
+                syncOp.Status = SyncOperationStatus.Failed;
+                syncOp.ErrorMessage = ex.Message;
+                results.Add(new SyncPushResultItem(op.ClientOperationId, false, ex.Message));
+            }
+
             db.SyncOperations.Add(syncOp);
-            results.Add(new SyncPushResultItem(op.ClientOperationId, true, null));
         }
 
         await db.SaveChangesAsync(ct);
@@ -352,6 +382,25 @@ public class SyncService(AppDbContext db, AuditService audit)
             request.Operations.Count.ToString(), null, null, ct);
 
         return new SyncPushResponse(results);
+    }
+
+    private async Task ProcessOperationAsync(Guid tenantId, Guid? userId, SyncOperation op, CancellationToken ct)
+    {
+        switch (op.OperationType)
+        {
+            case "STOCK_ADD":
+                var stockRequest = System.Text.Json.JsonSerializer.Deserialize<AddStockRequest>(op.PayloadJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (stockRequest != null)
+                {
+                    await inventory.AddStockAsync(tenantId, stockRequest, userId ?? Guid.Empty, ct);
+                }
+                break;
+            // Add more operation types here
+            default:
+                // If unknown, we still mark as completed but log warning or skip
+                break;
+        }
     }
 
     public async Task<object> GetStatusAsync(Guid tenantId, Guid deviceId, CancellationToken ct = default)
