@@ -324,7 +324,11 @@ public record SyncOperationItem(string ClientOperationId, string OperationType, 
 public record SyncPushResultItem(string ClientOperationId, bool Success, string? ErrorMessage);
 public record SyncPushResponse(IReadOnlyList<SyncPushResultItem> Results);
 
-public class SyncService(AppDbContext db, AuditService audit, InventoryService inventory)
+public class SyncService(
+    AppDbContext db,
+    AuditService audit,
+    InventoryService inventory,
+    IServiceProvider serviceProvider)
 {
     public async Task<SyncPushResponse> PushAsync(
         Guid tenantId,
@@ -393,7 +397,6 @@ public class SyncService(AppDbContext db, AuditService audit, InventoryService i
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (stockRequest != null)
                 {
-                    // Check for version conflict if version is specified
                     var existingStock = await db.InventoryStocks.IgnoreQueryFilters().FirstOrDefaultAsync(s =>
                         s.TenantId == tenantId &&
                         s.ItemId == stockRequest.ItemId &&
@@ -403,19 +406,32 @@ public class SyncService(AppDbContext db, AuditService audit, InventoryService i
 
                     if (existingStock != null && op.Version > 0 && op.Version <= existingStock.Version)
                     {
-                        // Conflict detected: client version is older than or equal to server version
-                        // Last-Write-Wins strategy using ClientTimestamp if available
                         if (op.ClientTimestamp.HasValue && existingStock.UpdatedAt.HasValue && op.ClientTimestamp.Value < existingStock.UpdatedAt.Value)
                         {
-                             // Skip processing as server has newer data
                              return;
                         }
                     }
-
                     await inventory.AddStockAsync(tenantId, stockRequest, userId ?? Guid.Empty, ct);
                 }
                 break;
-            // Add more operation types here
+            case "TRANSFER_LINE_UPDATE":
+                var transferLineReq = System.Text.Json.JsonSerializer.Deserialize<UpdateTransferLineRequest>(op.PayloadJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (transferLineReq != null)
+                {
+                    var transferService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<TransferService>(serviceProvider);
+                    await transferService.UpdateLineAsync(tenantId, Guid.Parse(op.ClientOperationId), transferLineReq, userId ?? Guid.Empty, ct);
+                }
+                break;
+            case "PICKING_LINE_UPDATE":
+                var pickingLineReq = System.Text.Json.JsonSerializer.Deserialize<UpdatePickingLineRequest>(op.PayloadJson,
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (pickingLineReq != null)
+                {
+                    var pickingService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<PickingService>(serviceProvider);
+                    await pickingService.UpdateStockLineAsync(tenantId, Guid.Parse(op.ClientOperationId), pickingLineReq.PickedQuantity, userId ?? Guid.Empty, ct);
+                }
+                break;
             default:
                 // If unknown, we still mark as completed but log warning or skip
                 break;
@@ -445,6 +461,9 @@ public class UserManagementService(AppDbContext db, AuditService audit)
     {
         if (await db.Users.AnyAsync(u => u.TenantId == tenantId && u.Username == request.Username, ct))
             throw new InvalidOperationException("Потребителското име вече съществува");
+
+        if (request.Password.Length < 8 || !request.Password.Any(char.IsUpper) || !request.Password.Any(char.IsDigit))
+            throw new InvalidOperationException("Паролата трябва да бъде поне 8 символа и да съдържа главна буква и цифра");
 
         var user = new User
         {
