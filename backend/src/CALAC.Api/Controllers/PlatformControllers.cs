@@ -273,6 +273,13 @@ public class DashboardController(DeviceService devices, WorkTaskService workTask
             })
             .ToListAsync(ct);
 
+        var operatorEfficiency = await db.OperatorPerformanceSnapshots
+            .Where(p => p.TenantId == TenantId)
+            .OrderByDescending(p => p.CreatedAt)
+            .Take(5)
+            .Select(p => new { p.UserId, p.EfficiencyRate, p.TasksCompleted })
+            .ToListAsync(ct);
+
         return Ok(new
         {
             totalDevices = allDevices.Count,
@@ -285,6 +292,7 @@ public class DashboardController(DeviceService devices, WorkTaskService workTask
             recentActivity,
             unreadAlertsCount = recentAlerts.Count(a => !a.isRead),
             recentAlerts,
+            operatorEfficiency,
             serverTime = DateTime.UtcNow
         });
     }
