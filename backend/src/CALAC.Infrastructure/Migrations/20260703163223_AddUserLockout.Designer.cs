@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CALAC.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260703160628_AddUserLockout")]
+    [Migration("20260703163223_AddUserLockout")]
     partial class AddUserLockout
     {
         /// <inheritdoc />

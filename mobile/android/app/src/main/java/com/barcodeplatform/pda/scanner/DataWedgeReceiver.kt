@@ -8,7 +8,9 @@ class DataWedgeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         if (intent == null) return
 
-        val barcode = intent.getStringExtra("com.symbol.datawedge.data_string")
+        val barcode = intent.getStringExtra("com.symbol.datawedge.data_string") // Zebra
+            ?: intent.getStringExtra("com.honeywell.decode.intent.extras.DATA") // Honeywell
+            ?: intent.getStringExtra("com.datalogic.decode.intent.extras.barcode_string") // Datalogic
             ?: intent.getStringExtra("data")
             ?: return
 
