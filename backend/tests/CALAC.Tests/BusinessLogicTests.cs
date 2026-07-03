@@ -4,6 +4,7 @@ using CALAC.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 
 namespace CALAC.Tests;
 
@@ -111,5 +112,72 @@ public class BusinessLogicTests
 
         // Should pick from Stock 2 because it expires first
         Assert.Equal(DateTime.UtcNow.AddDays(5).Date, stock!.ExpiryDate!.Value.Date);
+    }
+
+    [Fact]
+    public async Task AuthService_LoginWithPin_LocksOutAfterFailedAttempts()
+    {
+        // Arrange
+        using var db = CreateDbContext();
+        var configMock = new Mock<IConfiguration>();
+        var service = new AuthService(db, configMock.Object);
+        var tenantId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Username = "operator1",
+            PinHash = BCrypt.Net.BCrypt.HashPassword("1234"),
+            IsActive = true,
+            Tenant = new Tenant { Id = tenantId, Name = "Test Tenant", Code = "TT" }
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        // Act & Assert
+        for (int i = 0; i < 5; i++)
+        {
+            var result = await service.LoginWithPinAsync("operator1", "wrong");
+            Assert.False(result.Success);
+            Assert.Equal("Невалиден PIN код", result.Error);
+        }
+
+        // 6th attempt should be locked out
+        var lockoutResult = await service.LoginWithPinAsync("operator1", "1234");
+        Assert.False(lockoutResult.Success);
+        Assert.Contains("Акаунтът е блокиран", lockoutResult.Error!);
+    }
+
+    [Fact]
+    public async Task SyncService_ProcessOperation_AddsStockCorrectly()
+    {
+        // Arrange
+        using var db = CreateDbContext();
+        var audit = new Mock<AuditService>(db);
+        var inventory = new InventoryService(db, audit.Object);
+        var service = new SyncService(db, audit.Object, inventory);
+
+        var tenantId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-S", Name = "Sync Item", IsActive = true };
+        var location = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "LOC-S", Name = "Sync Loc", IsActive = true };
+        db.Items.Add(item);
+        db.Locations.Add(location);
+        await db.SaveChangesAsync();
+
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, location.Id, 5, "B1", null, null));
+        var operations = new List<SyncOperationItem>
+        {
+            new SyncOperationItem("op-1", "STOCK_ADD", payload, DateTime.UtcNow, 1)
+        };
+        var request = new SyncPushRequest(operations);
+
+        // Act
+        var result = await service.PushAsync(tenantId, Guid.NewGuid(), Guid.NewGuid(), request);
+
+        // Assert
+        Assert.True(result.Results[0].Success);
+        var stock = await db.InventoryStocks.FirstOrDefaultAsync(s => s.ItemId == item.Id && s.BatchNumber == "B1");
+        Assert.NotNull(stock);
+        Assert.Equal(5, stock.Quantity);
     }
 }

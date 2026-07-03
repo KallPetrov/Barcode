@@ -27,6 +27,8 @@ public class User : ITenantEntity
     public string FullName { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.Operator;
     public bool IsActive { get; set; } = true;
+    public int AccessFailedCount { get; set; }
+    public DateTimeOffset? LockoutEnd { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
 
