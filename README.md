@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.23.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.26.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📌 Текущо състояние (2026-07-08)
+## 📌 Текущо състояние (2026-07-11)
 
 CALAC вече включва:
 - **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;
@@ -129,5 +129,7 @@ npm run dev
 - Route optimization за picking
 - AI-Driven Analytics и аномалии
 - Manufacturing (BOM) и QA контрол
+- API v1 и Enterprise Security стандарти
+- Роботизация (AMR) и Computer Vision R&D
 
 © 2026 CALAC Platform. Всички права запазени.
