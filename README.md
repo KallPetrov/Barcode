@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.28.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.29.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📌 Текущо състояние (2026-07-13)
+## 📌 Текущо състояние (2026-07-14)
 
 CALAC вече включва:
 - **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;
@@ -37,8 +37,8 @@ CALAC вече включва:
 ### 🔐 Сигурност и основа
 - JWT автентикация и refresh token ротация
 - RBAC за Admin, Supervisor и Operator
-- Multi-tenancy с tenant isolation
-- Audit log за критични операции
+- Multi-tenancy с EF Core Global Filters
+- Audit log и Device Lockout защита
 
 ### 🏗️ Складови процеси
 - Управление на локации и артикули
@@ -49,11 +49,11 @@ CALAC вече включва:
 - Batch и wave picking
 
 ### 🔄 Интеграции и мониторинг
-- Webhook subscriptions за ERP/външни системи
-- Partner API ключове
-- SignalR нотификации в реално време
-- OpenTelemetry метрики и monitoring
-- ZPL/Labelary етикети за печат
+- ERP Адаптери (Odoo, Dynamics 365)
+- Webhook subscriptions и Partner API ключове
+- Real-time SignalR нотификации
+- OpenTelemetry & Prometheus мониторинг
+- ZPL/Labelary и GS1-128 поддръжка
 
 ### ☁️ SaaS подготовка
 - Self-service tenant onboarding
