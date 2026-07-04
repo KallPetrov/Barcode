@@ -7,3 +7,4 @@
 5. **Етап 5 (Enterprise)**: Multi-region, White-labeling, BI/Data Warehouse.
 6. **Manufacturing**: BOM, Work Orders, Kitting.
 7. **Quality Control**: QC Checklists, RMA, Mandatory Photos.
+8. **Next-Gen R&D**: 3D Digital Twin, ESG Tracking, Gamification, Wearable Integration.
