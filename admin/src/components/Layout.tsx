@@ -30,6 +30,7 @@ export function Layout() {
           <NavLink to="/audit-log">Одит лог</NavLink>
           <NavLink to="/billing">Абонамент</NavLink>
           <NavLink to="/shipping">Пратки (Shipping)</NavLink>
+          <NavLink to="/ecommerce">E-commerce</NavLink>
           {user?.role === 'Admin' && <NavLink to="/erp-configurations">ERP Конфигурации</NavLink>}
           {user?.role === 'Admin' && <NavLink to="/users">Потребители</NavLink>}
         </nav>

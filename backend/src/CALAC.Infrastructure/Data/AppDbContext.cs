@@ -38,6 +38,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<CourierConfiguration> CourierConfigurations => Set<CourierConfiguration>();
     public DbSet<Shipment> Shipments => Set<Shipment>();
+    public DbSet<EcommerceStore> EcommerceStores => Set<EcommerceStore>();
+    public DbSet<EcommerceOrder> EcommerceOrders => Set<EcommerceOrder>();
 
     public virtual Guid? CurrentTenantId => tenantService?.GetTenantId();
 
@@ -435,6 +437,37 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
             e.Property(x => x.TrackingUrl).HasMaxLength(500);
             e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
             e.HasOne(x => x.CourierConfiguration).WithMany().HasForeignKey(x => x.CourierConfigurationId);
+            e.HasOne(x => x.PickingOrder).WithMany().HasForeignKey(x => x.PickingOrderId);
+        });
+
+        modelBuilder.Entity<EcommerceStore>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.PlatformType });
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.StoreUrl).HasMaxLength(500);
+            e.Property(x => x.ConsumerKey).HasMaxLength(500);
+            e.Property(x => x.ConsumerSecret).HasMaxLength(500);
+            e.Property(x => x.WebhookSecret).HasMaxLength(500);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+        });
+
+        modelBuilder.Entity<EcommerceOrder>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.ExternalOrderId }).IsUnique();
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.ExternalOrderId).HasMaxLength(100);
+            e.Property(x => x.OrderNumber).HasMaxLength(100);
+            e.Property(x => x.CustomerName).HasMaxLength(200);
+            e.Property(x => x.CustomerEmail).HasMaxLength(200);
+            e.Property(x => x.CustomerPhone).HasMaxLength(50);
+            e.Property(x => x.ShippingAddress).HasMaxLength(500);
+            e.Property(x => x.ShippingCity).HasMaxLength(200);
+            e.Property(x => x.TotalAmount).HasPrecision(18, 4);
+            e.Property(x => x.Currency).HasMaxLength(10);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+            e.HasOne(x => x.EcommerceStore).WithMany(s => s.Orders).HasForeignKey(x => x.EcommerceStoreId);
             e.HasOne(x => x.PickingOrder).WithMany().HasForeignKey(x => x.PickingOrderId);
         });
     }

@@ -890,3 +890,36 @@ export async function generateWaybill(id: string) {
   const { data } = await api.post<any>(`/api/shipping/${id}/generate-waybill`);
   return data;
 }
+
+export interface EcommerceStore {
+  id: string;
+  name: string;
+  platformType: string;
+  storeUrl: string;
+  isActive: boolean;
+}
+
+export interface EcommerceOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  customerName: string;
+  totalAmount: number;
+  currency: string;
+  orderCreatedAt: string;
+  ecommerceStoreName?: string;
+}
+
+export async function getEcommerceStores() {
+  const { data } = await api.get<EcommerceStore[]>('/api/ecommerce/stores');
+  return data;
+}
+
+export async function getEcommerceOrders() {
+  const { data } = await api.get<EcommerceOrder[]>('/api/ecommerce/orders');
+  return data;
+}
+
+export async function syncEcommerceStore(id: string) {
+  await api.post(`/api/ecommerce/stores/${id}/sync`);
+}
