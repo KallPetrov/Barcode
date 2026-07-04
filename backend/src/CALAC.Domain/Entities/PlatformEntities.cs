@@ -207,6 +207,53 @@ public class Shipment : ITenantEntity
     public PickingOrder? PickingOrder { get; set; }
 }
 
+public class EcommerceStore : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public EcommercePlatformType PlatformType { get; set; }
+    public string StoreUrl { get; set; } = string.Empty;
+    public string? ConsumerKey { get; set; }
+    public string? ConsumerSecret { get; set; }
+    public string? WebhookSecret { get; set; }
+    public bool AutoImportOrders { get; set; } = true;
+    public bool AutoSyncStock { get; set; } = true;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+    public ICollection<EcommerceOrder> Orders { get; set; } = [];
+}
+
+public class EcommerceOrder : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid EcommerceStoreId { get; set; }
+    public string ExternalOrderId { get; set; } = string.Empty;
+    public string OrderNumber { get; set; } = string.Empty;
+    public EcommerceOrderStatus Status { get; set; } = EcommerceOrderStatus.Pending;
+    public Guid? PickingOrderId { get; set; }
+
+    // Customer Info
+    public string CustomerName { get; set; } = string.Empty;
+    public string CustomerEmail { get; set; } = string.Empty;
+    public string CustomerPhone { get; set; } = string.Empty;
+    public string ShippingAddress { get; set; } = string.Empty;
+    public string ShippingCity { get; set; } = string.Empty;
+
+    public decimal TotalAmount { get; set; }
+    public string Currency { get; set; } = "BGN";
+    public string? RawJson { get; set; }
+    public DateTime OrderCreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+    public EcommerceStore EcommerceStore { get; set; } = null!;
+    public PickingOrder? PickingOrder { get; set; }
+}
+
 public class TenantSubscription : ITenantEntity
 {
     public Guid Id { get; set; }

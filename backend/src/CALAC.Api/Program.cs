@@ -3,6 +3,7 @@ using System.Text;
 using CALAC.Api.Middleware;
 using CALAC.Infrastructure.Data;
 using CALAC.Infrastructure.Services;
+using CALAC.Infrastructure.Services.Ecommerce;
 using CALAC.Infrastructure.Services.Logistics;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -103,6 +104,9 @@ builder.Services.AddScoped<IZplService, ZplService>();
 builder.Services.AddScoped<ICourierAdapter, EcontAdapter>();
 builder.Services.AddScoped<ICourierAdapter, SpeedyAdapter>();
 builder.Services.AddScoped<ShippingService>();
+builder.Services.AddScoped<IEcommerceAdapter, WooCommerceAdapter>();
+builder.Services.AddScoped<IEcommerceAdapter, ShopifyAdapter>();
+builder.Services.AddScoped<EcommerceService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is required.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
