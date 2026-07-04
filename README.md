@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.31.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.32.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📌 Текущо състояние (2026-07-16)
+## 📌 Текущо състояние (2026-07-17)
 
 CALAC вече включва:
 - **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;

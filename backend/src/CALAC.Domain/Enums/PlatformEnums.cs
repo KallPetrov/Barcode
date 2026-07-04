@@ -21,3 +21,22 @@ public enum SyncOperationStatus
     Completed = 2,
     Failed = 3
 }
+
+public enum CourierType
+{
+    Econt = 0,
+    Speedy = 1,
+    Dhl = 2,
+    Other = 99
+}
+
+public enum ShipmentStatus
+{
+    Draft = 0,
+    LabelGenerated = 1,
+    HandedOver = 2,
+    InTransit = 3,
+    Delivered = 4,
+    Cancelled = 5,
+    Returned = 6
+}

@@ -36,6 +36,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
     public DbSet<NotificationAlert> NotificationAlerts => Set<NotificationAlert>();
     public DbSet<Reminder> Reminders => Set<Reminder>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<CourierConfiguration> CourierConfigurations => Set<CourierConfiguration>();
+    public DbSet<Shipment> Shipments => Set<Shipment>();
 
     public virtual Guid? CurrentTenantId => tenantService?.GetTenantId();
 
@@ -396,6 +398,44 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
             e.HasIndex(x => x.Token).IsUnique();
             e.Property(x => x.Token).HasMaxLength(200);
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId);
+        });
+
+        modelBuilder.Entity<CourierConfiguration>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.CourierType });
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.ApiUrl).HasMaxLength(500);
+            e.Property(x => x.ApiKey).HasMaxLength(500);
+            e.Property(x => x.Username).HasMaxLength(200);
+            e.Property(x => x.Password).HasMaxLength(200);
+            e.Property(x => x.ClientNumber).HasMaxLength(100);
+            e.Property(x => x.SettingsJson).HasMaxLength(2000);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+        });
+
+        modelBuilder.Entity<Shipment>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.Status });
+            e.HasIndex(x => x.WaybillNumber);
+            e.Property(x => x.ReferenceNumber).HasMaxLength(200);
+            e.Property(x => x.ReceiverName).HasMaxLength(200);
+            e.Property(x => x.ReceiverPhone).HasMaxLength(50);
+            e.Property(x => x.ReceiverEmail).HasMaxLength(200);
+            e.Property(x => x.ReceiverAddress).HasMaxLength(500);
+            e.Property(x => x.ReceiverCity).HasMaxLength(200);
+            e.Property(x => x.ReceiverPostCode).HasMaxLength(20);
+            e.Property(x => x.TotalWeight).HasPrecision(18, 4);
+            e.Property(x => x.CodAmount).HasPrecision(18, 4);
+            e.Property(x => x.Currency).HasMaxLength(10);
+            e.Property(x => x.WaybillNumber).HasMaxLength(100);
+            e.Property(x => x.LabelPdfUrl).HasMaxLength(500);
+            e.Property(x => x.LabelZpl).HasMaxLength(2000);
+            e.Property(x => x.TrackingUrl).HasMaxLength(500);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+            e.HasOne(x => x.CourierConfiguration).WithMany().HasForeignKey(x => x.CourierConfigurationId);
+            e.HasOne(x => x.PickingOrder).WithMany().HasForeignKey(x => x.PickingOrderId);
         });
     }
 }

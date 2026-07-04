@@ -6,6 +6,8 @@ using Moq;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using CALAC.Infrastructure.Services.Logistics;
 using System.Net;
 using System.Net.Http;
 
@@ -59,7 +61,9 @@ public class BusinessLogicTests
         hub.Setup(h => h.Clients).Returns(clients.Object);
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(group.Object);
 
-        var service = new PickingService(db, audit, alerts, hub.Object);
+        var shippingLogger = new Mock<ILogger<ShippingService>>();
+        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
+        var service = new PickingService(db, audit, alerts, hub.Object, shippingService);
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-1", Name = "Item 1" };
         db.Items.Add(item);
@@ -87,7 +91,9 @@ public class BusinessLogicTests
         var audit = new Mock<AuditService>(db);
         var alerts = new Mock<NotificationAlertService>(db, audit.Object);
         var hub = new Mock<IHubContext<DynamicHubProxy>>();
-        var service = new PickingService(db, audit.Object, alerts.Object, hub.Object);
+        var shippingLogger = new Mock<ILogger<ShippingService>>();
+        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
+        var service = new PickingService(db, audit.Object, alerts.Object, hub.Object, shippingService);
 
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-1", Name = "Item 1" };
