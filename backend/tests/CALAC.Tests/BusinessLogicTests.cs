@@ -253,7 +253,8 @@ public class BusinessLogicTests
 
         var forecast = await service.GetForecastAsync(tenantId, item.Id, 3, 0.5m);
 
-        Assert.Equal(25m, forecast.ExpectedDemand);
+        // (10*0.5 + 20*1.0 + 30*1.5) / (0.5 + 1.0 + 1.5) = 70 / 3 = 23.333...
+        Assert.Equal(23.33m, Math.Round(forecast.ExpectedDemand, 2));
     }
 
     [Fact]

@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.20.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.21.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📌 Текущо състояние (2026-07-04)
+## 📌 Текущо състояние (2026-07-06)
 
 CALAC вече включва:
 - **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;
@@ -123,10 +123,11 @@ npm run dev
 
 ## 🔭 Следващи приоритети
 
-- Stripe billing и lifecycle на планове
-- White-label branding за tenants
+- Stripe Integration и автоматизирано таксуване
+- Advanced Logistics (Econt/Speedy)
 - Voice picking за PDA устройства
 - Route optimization за picking
-- Advanced analytics и AI-assisted recommendations
+- AI-Driven Analytics и аномалии
+- Manufacturing (BOM) и QA контрол
 
 © 2026 CALAC Platform. Всички права запазени.
