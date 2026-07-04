@@ -3,6 +3,7 @@ using System.Text;
 using CALAC.Api.Middleware;
 using CALAC.Infrastructure.Data;
 using CALAC.Infrastructure.Services;
+using CALAC.Infrastructure.Services.Logistics;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -99,6 +100,9 @@ builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<TenantBrandingService>();
 builder.Services.AddHttpClient<WebhookSubscriptionService>();
 builder.Services.AddScoped<IZplService, ZplService>();
+builder.Services.AddScoped<ICourierAdapter, EcontAdapter>();
+builder.Services.AddScoped<ICourierAdapter, SpeedyAdapter>();
+builder.Services.AddScoped<ShippingService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is required.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

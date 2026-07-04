@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using CALAC.Infrastructure.Services.Logistics;
 
 namespace CALAC.Infrastructure.Services;
 
@@ -1428,7 +1429,7 @@ public record UpdatePickingLineRequest(
     Guid LineId,
     decimal PickedQuantity);
 
-public class PickingService(AppDbContext db, AuditService audit, NotificationAlertService alerts, IHubContext<DynamicHubProxy> hubContext)
+public class PickingService(AppDbContext db, AuditService audit, NotificationAlertService alerts, IHubContext<DynamicHubProxy> hubContext, ShippingService shippingService)
 {
     public async Task<IReadOnlyList<PickingOrderDto>> ListAsync(Guid tenantId, CancellationToken ct = default)
     {
@@ -1626,6 +1627,28 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
         if (hubContext?.Clients != null)
         {
             await hubContext.Clients.Group(tenantId.ToString()).SendAsync("WarehouseEvent", new { type = "PICKING_COMPLETED", name = order.Name }, ct);
+        }
+
+        // Автоматично генериране на пратка, ако има конфигурация за куриер (За демо цели приемаме първата активна)
+        var courierConfig = await db.CourierConfigurations.FirstOrDefaultAsync(c => c.TenantId == tenantId && c.IsActive, ct);
+        if (courierConfig != null)
+        {
+            var shipment = new Shipment
+            {
+                TenantId = tenantId,
+                PickingOrderId = order.Id,
+                CourierConfigurationId = courierConfig.Id,
+                ReceiverName = "Клиент " + (order.Reference ?? order.Name),
+                ReceiverAddress = "ул. Складова 1, гр. София", // Mock data
+                ReceiverCity = "София",
+                ReceiverPhone = "0888000000",
+                TotalWeight = 1.5m, // Mock weight
+                Status = ShipmentStatus.Draft
+            };
+
+            await shippingService.CreateShipmentAsync(shipment);
+            // Опционално автоматично генериране на товарителница
+            await shippingService.GenerateWaybillAsync(shipment.Id);
         }
 
         return await GetAsync(tenantId, order.Id, ct);

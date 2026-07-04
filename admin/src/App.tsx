@@ -19,6 +19,7 @@ import { OperatorPerformancePage } from './pages/OperatorPerformancePage';
 import { AlertsPage } from './pages/AlertsPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import BillingPage from './pages/BillingPage';
+import { ShippingDashboardPage } from './pages/ShippingDashboardPage';
 import './App.css';
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
               <Route path="billing" element={<BillingPage />} />
+              <Route path="shipping" element={<ShippingDashboardPage />} />
               <Route element={<AdminRoute />}>
                 <Route path="users" element={<UsersPage />} />
                 <Route path="erp-configurations" element={<ErpConfigurationsPage />} />

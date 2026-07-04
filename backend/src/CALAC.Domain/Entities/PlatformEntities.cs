@@ -150,6 +150,63 @@ public class WaveBatch : ITenantEntity
     public Tenant Tenant { get; set; } = null!;
 }
 
+public class CourierConfiguration : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public CourierType CourierType { get; set; }
+    public string ApiUrl { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
+    public string? Username { get; set; }
+    public string? Password { get; set; }
+    public string? ClientNumber { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? SettingsJson { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+}
+
+public class Shipment : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string? ReferenceNumber { get; set; }
+    public Guid? PickingOrderId { get; set; }
+    public Guid CourierConfigurationId { get; set; }
+    public ShipmentStatus Status { get; set; } = ShipmentStatus.Draft;
+
+    // Receiver Info
+    public string ReceiverName { get; set; } = string.Empty;
+    public string ReceiverPhone { get; set; } = string.Empty;
+    public string ReceiverEmail { get; set; } = string.Empty;
+    public string ReceiverAddress { get; set; } = string.Empty;
+    public string ReceiverCity { get; set; } = string.Empty;
+    public string? ReceiverPostCode { get; set; }
+
+    // Package Info
+    public int PackageCount { get; set; } = 1;
+    public decimal TotalWeight { get; set; }
+    public bool IsCashOnDelivery { get; set; }
+    public decimal? CodAmount { get; set; }
+    public string? Currency { get; set; } = "BGN";
+
+    // Waybill Info
+    public string? WaybillNumber { get; set; }
+    public string? LabelPdfUrl { get; set; }
+    public string? LabelZpl { get; set; }
+    public string? TrackingUrl { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ShippedAt { get; set; }
+    public DateTime? DeliveredAt { get; set; }
+
+    public Tenant Tenant { get; set; } = null!;
+    public CourierConfiguration CourierConfiguration { get; set; } = null!;
+    public PickingOrder? PickingOrder { get; set; }
+}
+
 public class TenantSubscription : ITenantEntity
 {
     public Guid Id { get; set; }

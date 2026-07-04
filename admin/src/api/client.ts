@@ -864,3 +864,29 @@ export async function createPortalSession(payload: { returnUrl: string }) {
   const { data } = await api.post<{ url: string }>('/api/billing/portal', payload);
   return data;
 }
+
+export interface Shipment {
+  id: string;
+  referenceNumber?: string;
+  pickingOrderId?: string;
+  courierConfigurationId: string;
+  status: string;
+  receiverName: string;
+  receiverPhone: string;
+  receiverAddress: string;
+  receiverCity: string;
+  waybillNumber?: string;
+  labelPdfUrl?: string;
+  trackingUrl?: string;
+  createdAt: string;
+}
+
+export async function getShipments() {
+  const { data } = await api.get<Shipment[]>('/api/shipping');
+  return data;
+}
+
+export async function generateWaybill(id: string) {
+  const { data } = await api.post<any>(`/api/shipping/${id}/generate-waybill`);
+  return data;
+}
