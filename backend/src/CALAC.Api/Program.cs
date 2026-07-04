@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using CALAC.Api.Middleware;
 using CALAC.Infrastructure.Data;
 using CALAC.Infrastructure.Services;
 using OpenTelemetry.Metrics;
@@ -94,6 +95,7 @@ builder.Services.AddScoped<PartnerApiKeyService>();
 builder.Services.AddScoped<ForecastingService>();
 builder.Services.AddScoped<BatchPickingService>();
 builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<TenantBrandingService>();
 builder.Services.AddHttpClient<WebhookSubscriptionService>();
 builder.Services.AddScoped<IZplService, ZplService>();
@@ -147,6 +149,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseSubscriptionCheck();
 app.MapControllers();
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
 app.MapHub<CALAC.Api.Hubs.WarehouseHub>("/hub/warehouse");

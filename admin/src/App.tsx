@@ -18,6 +18,7 @@ import { WorkTasksPage } from './pages/WorkTasksPage';
 import { OperatorPerformancePage } from './pages/OperatorPerformancePage';
 import { AlertsPage } from './pages/AlertsPage';
 import { AuditLogPage } from './pages/AuditLogPage';
+import BillingPage from './pages/BillingPage';
 import './App.css';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
               <Route path="operator-performance" element={<OperatorPerformancePage />} />
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="audit-log" element={<AuditLogPage />} />
+              <Route path="billing" element={<BillingPage />} />
               <Route element={<AdminRoute />}>
                 <Route path="users" element={<UsersPage />} />
                 <Route path="erp-configurations" element={<ErpConfigurationsPage />} />

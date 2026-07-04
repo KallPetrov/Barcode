@@ -156,6 +156,8 @@ public class TenantSubscription : ITenantEntity
     public Guid TenantId { get; set; }
     public string PlanCode { get; set; } = "starter";
     public bool IsActive { get; set; } = true;
+    public string? StripeSubscriptionId { get; set; }
+    public string? StripeCustomerId { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

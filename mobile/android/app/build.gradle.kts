@@ -12,8 +12,8 @@ android {
         applicationId = "com.barcodeplatform.pda"
         minSdk = 23
         targetSdk = 35
-        versionCode = 30
-        versionName = "0.30.0"
+        versionCode = 31
+        versionName = "0.31.0"
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5000/\"")
     }
 
