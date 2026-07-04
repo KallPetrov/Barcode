@@ -233,6 +233,319 @@ public record DeviceDto(
     DateTime RegisteredAt,
     DateTime? LastSeenAt);
 
+public record CreateWebhookSubscriptionRequest(string Name, string EventType, string Url, string? Secret, bool IsActive);
+public record WebhookSubscriptionDto(Guid Id, string Name, string EventType, string Url, string? Secret, bool IsActive, DateTime? LastSuccessAt, string? LastError, DateTime CreatedAt);
+
+public class WebhookSubscriptionService(AppDbContext db, AuditService audit, HttpClient httpClient)
+{
+    public async Task<IReadOnlyList<WebhookSubscriptionDto>> ListAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var subscriptions = await db.WebhookSubscriptions
+            .Where(s => s.TenantId == tenantId)
+            .OrderByDescending(s => s.CreatedAt)
+            .ToListAsync(ct);
+
+        return subscriptions.Select(MapToDto).ToList();
+    }
+
+    public async Task<WebhookSubscriptionDto> CreateAsync(Guid tenantId, CreateWebhookSubscriptionRequest request, Guid userId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name)) throw new InvalidOperationException("Името на абонамента е задължително");
+        if (string.IsNullOrWhiteSpace(request.EventType)) throw new InvalidOperationException("Събитието е задължително");
+        if (string.IsNullOrWhiteSpace(request.Url)) throw new InvalidOperationException("URL адресът е задължителен");
+
+        var subscription = new WebhookSubscription
+        {
+            TenantId = tenantId,
+            Name = request.Name.Trim(),
+            EventType = request.EventType.Trim(),
+            Url = request.Url.Trim(),
+            Secret = request.Secret,
+            IsActive = request.IsActive
+        };
+
+        db.WebhookSubscriptions.Add(subscription);
+        await db.SaveChangesAsync(ct);
+
+        await audit.LogAsync(tenantId, "WEBHOOK_SUBSCRIPTION_CREATED", userId, null, "WebhookSubscription", subscription.Id.ToString(), null, null, ct);
+
+        return MapToDto(subscription);
+    }
+
+    public async Task PublishAsync(Guid tenantId, string eventType, object payload, CancellationToken ct = default)
+    {
+        var subscriptions = await db.WebhookSubscriptions
+            .Where(s => s.TenantId == tenantId && s.IsActive && s.EventType == eventType)
+            .ToListAsync(ct);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(payload);
+
+        foreach (var subscription in subscriptions)
+        {
+            try
+            {
+                using var content = new StringContent(json, Encoding.UTF8, "application/json");
+                using var request = new HttpRequestMessage(HttpMethod.Post, subscription.Url)
+                {
+                    Content = content
+                };
+                request.Headers.Add("X-Webhook-Event", eventType);
+                request.Headers.Add("X-Webhook-Tenant", tenantId.ToString());
+
+                if (!string.IsNullOrWhiteSpace(subscription.Secret))
+                {
+                    request.Headers.Add("X-Webhook-Signature", Convert.ToHexString(Encoding.UTF8.GetBytes(subscription.Secret)));
+                }
+
+                using var response = await httpClient.SendAsync(request, ct);
+                response.EnsureSuccessStatusCode();
+
+                subscription.LastSuccessAt = DateTime.UtcNow;
+                subscription.LastError = null;
+                subscription.UpdatedAt = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                subscription.LastError = ex.Message;
+                subscription.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static WebhookSubscriptionDto MapToDto(WebhookSubscription subscription) =>
+        new(subscription.Id, subscription.Name, subscription.EventType, subscription.Url, subscription.Secret, subscription.IsActive, subscription.LastSuccessAt, subscription.LastError, subscription.CreatedAt);
+}
+
+public record CreateTenantOnboardingRequest(string TenantName, string TenantCode, string AdminUsername, string AdminPassword, string AdminFullName);
+public record TenantOnboardingResult(Guid TenantId, string TenantName, string AdminUsername);
+
+public record CreatePartnerApiKeyRequest(string Name, string? Description);
+public record PartnerApiKeyDto(Guid Id, string Name, string Key, string? Description, bool IsActive, DateTime CreatedAt, DateTime? LastUsedAt);
+
+public record ForecastPoint(DateTime Timestamp, decimal Quantity);
+public record ForecastResult(Guid ItemId, decimal ExpectedDemand, decimal RecommendedReorderPoint);
+
+public class ForecastingService(AppDbContext db, AuditService audit)
+{
+    public async Task<ForecastResult> GetForecastAsync(Guid tenantId, Guid itemId, int lookbackPeriods = 3, decimal smoothingFactor = 0.5m, CancellationToken ct = default)
+    {
+        var history = await db.InventoryStocks
+            .Where(s => s.TenantId == tenantId && s.ItemId == itemId)
+            .OrderByDescending(s => s.CreatedAt)
+            .Take(Math.Max(1, lookbackPeriods))
+            .Select(s => new ForecastPoint(s.CreatedAt, s.Quantity))
+            .ToListAsync(ct);
+
+        if (history.Count == 0)
+            throw new KeyNotFoundException("Няма история за този артикул");
+
+        var points = history.OrderBy(p => p.Timestamp).ToList();
+        decimal weighted = 0m;
+        decimal weightSum = 0m;
+
+        for (var i = 0; i < points.Count; i++)
+        {
+            var weight = (i + 1) * smoothingFactor;
+            weighted += points[i].Quantity * weight;
+            weightSum += weight;
+        }
+
+        var expectedDemand = weightSum == 0 ? 0m : weighted / weightSum;
+        var recommendedReorderPoint = expectedDemand * 1.2m;
+
+        await audit.LogAsync(tenantId, "FORECAST_REQUESTED", null, null, "Forecast", itemId.ToString(), null, null, ct);
+        return new ForecastResult(itemId, expectedDemand, recommendedReorderPoint);
+    }
+}
+
+public record CreateBatchWaveRequest(string Name, IEnumerable<Guid> PickingOrderIds);
+public record BatchWaveDto(Guid Id, string Name, IReadOnlyList<Guid> Orders, IReadOnlyList<BatchWaveGroupDto> Groups);
+public record BatchWaveGroupDto(string LocationKey, IReadOnlyList<Guid> PickingOrderIds);
+
+public class BatchPickingService(AppDbContext db, AuditService audit)
+{
+    public async Task<BatchWaveDto> CreateWaveAsync(Guid tenantId, CreateBatchWaveRequest request, Guid userId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name)) throw new InvalidOperationException("Името на wave-a е задължително");
+
+        var orderIds = request.PickingOrderIds?.Distinct().ToList() ?? [];
+        if (orderIds.Count == 0) throw new InvalidOperationException("Трябва да има поне една picking поръчка");
+
+        var orders = await db.PickingOrders
+            .Include(o => o.Lines)
+            .Where(o => o.TenantId == tenantId && orderIds.Contains(o.Id))
+            .ToListAsync(ct);
+
+        var groups = orders
+            .SelectMany(o => o.Lines.Where(l => l.SourceLocationId.HasValue).Select(l => new { OrderId = o.Id, LocationKey = l.SourceLocationId!.Value.ToString() }))
+            .GroupBy(x => x.LocationKey)
+            .Select(g => new BatchWaveGroupDto(g.Key, g.Select(x => x.OrderId).Distinct().ToList()))
+            .ToList();
+
+        if (groups.Count == 0)
+            groups.Add(new BatchWaveGroupDto("Unassigned", orders.Select(o => o.Id).ToList()));
+
+        var wave = new WaveBatch { Id = Guid.NewGuid(), TenantId = tenantId, Name = request.Name.Trim(), OrdersJson = System.Text.Json.JsonSerializer.Serialize(orderIds) };
+        db.Set<WaveBatch>().Add(wave);
+        await db.SaveChangesAsync(ct);
+
+        await audit.LogAsync(tenantId, "BATCH_WAVE_CREATED", userId, null, "BatchWave", wave.Id.ToString(), null, null, ct);
+
+        return new BatchWaveDto(wave.Id, wave.Name, orderIds, groups);
+    }
+}
+
+public record ActivateSubscriptionRequest(string PlanCode, int? Days);
+public record SubscriptionDto(Guid TenantId, string PlanCode, bool IsActive, DateTime? ExpiresAt, DateTime CreatedAt);
+public record UpsertTenantBrandingRequest(string? CompanyName, string? LogoUrl, string? PrimaryColor, string? SecondaryColor, string? FaviconUrl, string? WelcomeMessage);
+public record TenantBrandingDto(Guid Id, Guid TenantId, string CompanyName, string? LogoUrl, string PrimaryColor, string SecondaryColor, string? FaviconUrl, string? WelcomeMessage, DateTime CreatedAt, DateTime? UpdatedAt);
+
+public class TenantBrandingService(AppDbContext db, AuditService audit)
+{
+    public async Task<TenantBrandingDto> GetOrCreateAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var branding = await db.TenantBrandings.FirstOrDefaultAsync(b => b.TenantId == tenantId, ct);
+        if (branding is null)
+        {
+            branding = new TenantBranding { TenantId = tenantId, CompanyName = "CALAC" };
+            db.TenantBrandings.Add(branding);
+            await db.SaveChangesAsync(ct);
+        }
+
+        return Map(branding);
+    }
+
+    public async Task<TenantBrandingDto> UpsertAsync(Guid tenantId, UpsertTenantBrandingRequest request, Guid userId, CancellationToken ct = default)
+    {
+        var branding = await db.TenantBrandings.FirstOrDefaultAsync(b => b.TenantId == tenantId, ct) ?? new TenantBranding { TenantId = tenantId };
+        branding.CompanyName = string.IsNullOrWhiteSpace(request.CompanyName) ? "CALAC" : request.CompanyName.Trim();
+        branding.LogoUrl = string.IsNullOrWhiteSpace(request.LogoUrl) ? null : request.LogoUrl.Trim();
+        branding.PrimaryColor = string.IsNullOrWhiteSpace(request.PrimaryColor) ? "#2563eb" : request.PrimaryColor.Trim();
+        branding.SecondaryColor = string.IsNullOrWhiteSpace(request.SecondaryColor) ? "#0f172a" : request.SecondaryColor.Trim();
+        branding.FaviconUrl = string.IsNullOrWhiteSpace(request.FaviconUrl) ? null : request.FaviconUrl.Trim();
+        branding.WelcomeMessage = string.IsNullOrWhiteSpace(request.WelcomeMessage) ? null : request.WelcomeMessage.Trim();
+        branding.UpdatedAt = DateTime.UtcNow;
+
+        if (branding.Id == Guid.Empty)
+        {
+            branding.Id = Guid.NewGuid();
+            db.TenantBrandings.Add(branding);
+        }
+
+        await db.SaveChangesAsync(ct);
+        await audit.LogAsync(tenantId, "TENANT_BRANDING_UPDATED", userId, null, "TenantBranding", branding.Id.ToString(), null, null, ct);
+        return Map(branding);
+    }
+
+    private static TenantBrandingDto Map(TenantBranding branding) => new(branding.Id, branding.TenantId, branding.CompanyName, branding.LogoUrl, branding.PrimaryColor, branding.SecondaryColor, branding.FaviconUrl, branding.WelcomeMessage, branding.CreatedAt, branding.UpdatedAt);
+}
+
+public class SubscriptionService(AppDbContext db, AuditService audit)
+{
+    public async Task<SubscriptionDto> ActivatePlanAsync(Guid tenantId, ActivateSubscriptionRequest request, Guid userId, CancellationToken ct = default)
+    {
+        var planCode = string.IsNullOrWhiteSpace(request.PlanCode) ? "starter" : request.PlanCode.Trim().ToLowerInvariant();
+        var days = request.Days ?? 30;
+        var expiresAt = DateTime.UtcNow.AddDays(days);
+
+        var subscription = await db.TenantSubscriptions.FirstOrDefaultAsync(s => s.TenantId == tenantId, ct) ?? new TenantSubscription { TenantId = tenantId };
+        subscription.PlanCode = planCode;
+        subscription.IsActive = true;
+        subscription.ExpiresAt = expiresAt;
+        subscription.UpdatedAt = DateTime.UtcNow;
+
+        if (subscription.Id == Guid.Empty)
+        {
+            subscription.Id = Guid.NewGuid();
+            db.TenantSubscriptions.Add(subscription);
+        }
+
+        await db.SaveChangesAsync(ct);
+        await audit.LogAsync(tenantId, "SUBSCRIPTION_ACTIVATED", userId, null, "TenantSubscription", subscription.Id.ToString(), null, null, ct);
+        return new SubscriptionDto(subscription.TenantId, subscription.PlanCode, subscription.IsActive, subscription.ExpiresAt, subscription.CreatedAt);
+    }
+}
+
+public class TenantOnboardingService(AppDbContext db, AuditService audit)
+{
+    public async Task<TenantOnboardingResult> CreateAsync(CreateTenantOnboardingRequest request, Guid userId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.TenantName)) throw new InvalidOperationException("Името на клиента е задължително");
+        if (string.IsNullOrWhiteSpace(request.TenantCode)) throw new InvalidOperationException("Кодът на клиента е задължителен");
+        if (string.IsNullOrWhiteSpace(request.AdminUsername)) throw new InvalidOperationException("Потребителското име е задължително");
+        if (string.IsNullOrWhiteSpace(request.AdminPassword)) throw new InvalidOperationException("Паролата е задължителна");
+
+        if (await db.Tenants.AnyAsync(t => t.Code == request.TenantCode, ct))
+            throw new InvalidOperationException("Този код за клиент вече е зает");
+
+        var tenant = new Tenant
+        {
+            Name = request.TenantName.Trim(),
+            Code = request.TenantCode.Trim().ToUpperInvariant(),
+            IsActive = true
+        };
+
+        db.Tenants.Add(tenant);
+        await db.SaveChangesAsync(ct);
+
+        var admin = new User
+        {
+            TenantId = tenant.Id,
+            Username = request.AdminUsername.Trim(),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.AdminPassword),
+            FullName = string.IsNullOrWhiteSpace(request.AdminFullName) ? request.AdminUsername.Trim() : request.AdminFullName.Trim(),
+            Role = UserRole.Admin,
+            IsActive = true,
+            Tenant = tenant
+        };
+
+        db.Users.Add(admin);
+        await db.SaveChangesAsync(ct);
+
+        await audit.LogAsync(tenant.Id, "TENANT_ONBOARDED", userId, null, "Tenant", tenant.Id.ToString(), null, null, ct);
+
+        return new TenantOnboardingResult(tenant.Id, tenant.Name, admin.Username);
+    }
+}
+
+public class PartnerApiKeyService(AppDbContext db, AuditService audit)
+{
+    public async Task<PartnerApiKeyDto> CreateAsync(Guid tenantId, CreatePartnerApiKeyRequest request, Guid userId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name)) throw new InvalidOperationException("Името на API ключа е задължително");
+
+        var key = $"pk_{Guid.NewGuid():N}";
+        var entity = new PartnerApiKey
+        {
+            TenantId = tenantId,
+            Name = request.Name.Trim(),
+            Key = key,
+            Description = request.Description,
+            IsActive = true
+        };
+
+        db.PartnerApiKeys.Add(entity);
+        await db.SaveChangesAsync(ct);
+        await audit.LogAsync(tenantId, "PARTNER_API_KEY_CREATED", userId, null, "PartnerApiKey", entity.Id.ToString(), null, null, ct);
+
+        return new PartnerApiKeyDto(entity.Id, entity.Name, entity.Key, entity.Description, entity.IsActive, entity.CreatedAt, entity.LastUsedAt);
+    }
+
+    public async Task<bool> ValidateAsync(Guid tenantId, string? key, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return false;
+
+        var entity = await db.PartnerApiKeys.FirstOrDefaultAsync(k => k.TenantId == tenantId && k.IsActive && k.Key == key, ct);
+        if (entity is null) return false;
+
+        entity.LastUsedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+}
+
 public class DeviceService(AppDbContext db, AuditService audit)
 {
     public async Task<DeviceDto> RegisterOrUpdateAsync(
@@ -335,9 +648,55 @@ public class SyncService(
         Guid deviceId,
         Guid? userId,
         SyncPushRequest request,
+        string? idempotencyKey = null,
         CancellationToken ct = default)
     {
         var results = new List<SyncPushResultItem>();
+
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var existingBatch = await db.SyncOperations
+                .FirstOrDefaultAsync(s => s.DeviceId == deviceId && s.IdempotencyKey == idempotencyKey, ct);
+
+            if (existingBatch is not null)
+            {
+                results.AddRange(request.Operations.Select(op => new SyncPushResultItem(op.ClientOperationId, true, "Повторен request е игнориран")));
+                await audit.LogAsync(tenantId, "SYNC_PUSH_DUPLICATE", userId, deviceId, "Sync",
+                    request.Operations.Count.ToString(), null, null, ct);
+                return new SyncPushResponse(results);
+            }
+
+            var batchOperation = new SyncOperation
+            {
+                TenantId = tenantId,
+                DeviceId = deviceId,
+                ClientOperationId = $"idem:{idempotencyKey}",
+                IdempotencyKey = idempotencyKey,
+                OperationType = "SYNC_BATCH",
+                Status = SyncOperationStatus.Completed,
+                CreatedAt = DateTime.UtcNow,
+                ProcessedAt = DateTime.UtcNow
+            };
+            db.SyncOperations.Add(batchOperation);
+
+            foreach (var op in request.Operations)
+            {
+                try
+                {
+                    await ProcessOperationAsync(tenantId, userId, op, ct);
+                    results.Add(new SyncPushResultItem(op.ClientOperationId, true, null));
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new SyncPushResultItem(op.ClientOperationId, false, ex.Message));
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(tenantId, "SYNC_PUSH", userId, deviceId, "Sync",
+                request.Operations.Count.ToString(), null, null, ct);
+            return new SyncPushResponse(results);
+        }
 
         foreach (var op in request.Operations)
         {
@@ -366,7 +725,7 @@ public class SyncService(
 
             try
             {
-                await ProcessOperationAsync(tenantId, userId, syncOp, ct);
+                await ProcessOperationAsync(tenantId, userId, op, ct);
                 syncOp.Status = SyncOperationStatus.Completed;
                 syncOp.ProcessedAt = DateTime.UtcNow;
                 results.Add(new SyncPushResultItem(op.ClientOperationId, true, null));
@@ -388,12 +747,23 @@ public class SyncService(
         return new SyncPushResponse(results);
     }
 
-    private async Task ProcessOperationAsync(Guid tenantId, Guid? userId, SyncOperation op, CancellationToken ct)
+    private async Task ProcessOperationAsync(Guid tenantId, Guid? userId, SyncOperationItem op, CancellationToken ct)
     {
-        switch (op.OperationType)
+        var syncOp = new SyncOperation
+        {
+            TenantId = tenantId,
+            DeviceId = Guid.Empty,
+            ClientOperationId = op.ClientOperationId,
+            OperationType = op.OperationType,
+            PayloadJson = op.PayloadJson,
+            ClientTimestamp = op.ClientTimestamp,
+            Version = op.Version ?? 1
+        };
+
+        switch (syncOp.OperationType)
         {
             case "STOCK_ADD":
-                var stockRequest = System.Text.Json.JsonSerializer.Deserialize<AddStockRequest>(op.PayloadJson,
+                var stockRequest = System.Text.Json.JsonSerializer.Deserialize<AddStockRequest>(syncOp.PayloadJson,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (stockRequest != null)
                 {
@@ -404,9 +774,9 @@ public class SyncService(
                         s.BatchNumber == stockRequest.BatchNumber &&
                         s.SerialNumber == stockRequest.SerialNumber, ct);
 
-                    if (existingStock != null && op.Version > 0 && op.Version <= existingStock.Version)
+                    if (existingStock != null && syncOp.Version > 0 && syncOp.Version <= existingStock.Version)
                     {
-                        if (op.ClientTimestamp.HasValue && existingStock.UpdatedAt.HasValue && op.ClientTimestamp.Value < existingStock.UpdatedAt.Value)
+                        if (syncOp.ClientTimestamp.HasValue && existingStock.UpdatedAt.HasValue && syncOp.ClientTimestamp.Value < existingStock.UpdatedAt.Value)
                         {
                              return;
                         }
@@ -415,25 +785,24 @@ public class SyncService(
                 }
                 break;
             case "TRANSFER_LINE_UPDATE":
-                var transferLineReq = System.Text.Json.JsonSerializer.Deserialize<UpdateTransferLineRequest>(op.PayloadJson,
+                var transferLineReq = System.Text.Json.JsonSerializer.Deserialize<UpdateTransferLineRequest>(syncOp.PayloadJson,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (transferLineReq != null)
                 {
                     var transferService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<TransferService>(serviceProvider);
-                    await transferService.UpdateLineAsync(tenantId, Guid.Parse(op.ClientOperationId), transferLineReq, userId ?? Guid.Empty, ct);
+                    await transferService.UpdateLineAsync(tenantId, Guid.Parse(syncOp.ClientOperationId), transferLineReq, userId ?? Guid.Empty, ct);
                 }
                 break;
             case "PICKING_LINE_UPDATE":
-                var pickingLineReq = System.Text.Json.JsonSerializer.Deserialize<UpdatePickingLineRequest>(op.PayloadJson,
+                var pickingLineReq = System.Text.Json.JsonSerializer.Deserialize<UpdatePickingLineRequest>(syncOp.PayloadJson,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (pickingLineReq != null)
                 {
                     var pickingService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<PickingService>(serviceProvider);
-                    await pickingService.UpdateStockLineAsync(tenantId, Guid.Parse(op.ClientOperationId), pickingLineReq.PickedQuantity, userId ?? Guid.Empty, ct);
+                    await pickingService.UpdateStockLineAsync(tenantId, Guid.Parse(syncOp.ClientOperationId), pickingLineReq.PickedQuantity, userId ?? Guid.Empty, ct);
                 }
                 break;
             default:
-                // If unknown, we still mark as completed but log warning or skip
                 break;
         }
     }
@@ -574,15 +943,37 @@ public record CreateLocationRequest(string Code, string Name, string? Zone, stri
 public record UpdateLocationRequest(string Code, string Name, string? Zone, string? Aisle, string? Rack, string? Level, string? Position, bool IsActive);
 
 public record ItemDto(Guid Id, string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, bool IsActive, DateTime CreatedAt);
+public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
 
 public class ItemService(AppDbContext db, AuditService audit)
 {
-    public async Task<IReadOnlyList<ItemDto>> ListAsync(Guid tenantId, CancellationToken ct = default) =>
-        await db.Items
-            .Where(i => i.TenantId == tenantId)
-            .OrderBy(i => i.Sku)
+    public async Task<PagedResult<ItemDto>> ListAsync(Guid tenantId, int page = 1, int pageSize = 50, string? search = null, string? sortBy = "sku", string? sortDirection = "asc", CancellationToken ct = default)
+    {
+        var query = db.Items
+            .Where(i => i.TenantId == tenantId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalized = search.Trim();
+            query = query.Where(i => i.Sku.Contains(normalized) || i.Name.Contains(normalized) || (i.Barcode != null && i.Barcode.Contains(normalized)));
+        }
+
+        query = sortBy?.ToLowerInvariant() switch
+        {
+            "name" => sortDirection == "desc" ? query.OrderByDescending(i => i.Name) : query.OrderBy(i => i.Name),
+            "createdat" => sortDirection == "desc" ? query.OrderByDescending(i => i.CreatedAt) : query.OrderBy(i => i.CreatedAt),
+            _ => sortDirection == "desc" ? query.OrderByDescending(i => i.Sku) : query.OrderBy(i => i.Sku)
+        };
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(i => new ItemDto(i.Id, i.Sku, i.Name, i.Description, i.Barcode, i.BarcodeType, i.ImageUrl, i.Weight, i.UnitOfMeasure, i.IsActive, i.CreatedAt))
             .ToListAsync(ct);
+
+        return new PagedResult<ItemDto>(items, totalCount, page, pageSize);
+    }
 
     public async Task<ItemDto?> GetAsync(Guid tenantId, Guid id, CancellationToken ct = default)
     {
@@ -749,6 +1140,51 @@ public record InventoryCountDto(Guid Id, Guid SessionId, Guid ItemId, string Ite
 
 public class InventorySessionService(AppDbContext db, AuditService audit, NotificationAlertService alerts, IHubContext<DynamicHubProxy> hubContext)
 {
+    public async Task<InventorySessionDto> CreatePlannedAsync(Guid tenantId, CreatePlannedSessionRequest request, Guid userId, CancellationToken ct = default)
+    {
+        var session = new InventorySession
+        {
+            TenantId = tenantId,
+            Name = request.Name,
+            Description = request.Description,
+            Status = InventorySessionStatus.Draft
+        };
+
+        db.InventorySessions.Add(session);
+        await db.SaveChangesAsync(ct);
+        await audit.LogAsync(tenantId, "SESSION_PLANNED", userId, null, "InventorySession", session.Id.ToString(),
+            $"Zone={request.Zone ?? "ALL"}, Category={request.Category ?? "ALL"}", null, ct);
+
+        var stockQuery = db.InventoryStocks.Where(s => s.TenantId == tenantId);
+        if (!string.IsNullOrWhiteSpace(request.Zone))
+        {
+            stockQuery = stockQuery.Where(s => s.Location != null && s.Location.Zone != null && s.Location.Zone.Contains(request.Zone));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Category))
+        {
+            stockQuery = stockQuery.Where(s => s.Item != null && s.Item.Sku.Contains(request.Category));
+        }
+
+        var stockList = await stockQuery.Include(s => s.Item).Include(s => s.Location).ToListAsync(ct);
+        foreach (var stock in stockList)
+        {
+            db.InventoryCounts.Add(new InventoryCount
+            {
+                TenantId = tenantId,
+                InventorySessionId = session.Id,
+                ItemId = stock.ItemId,
+                LocationId = stock.LocationId,
+                ExpectedQuantity = stock.Quantity,
+                BatchNumber = stock.BatchNumber,
+                SerialNumber = stock.SerialNumber
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        return await GetAsync(tenantId, session.Id, ct);
+    }
+
     public async Task<IReadOnlyList<InventorySessionDto>> ListAsync(Guid tenantId, CancellationToken ct = default) =>
         await db.InventorySessions
             .Include(s => s.StartedByUser)
@@ -926,6 +1362,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
 }
 
 public record CreateSessionRequest(string Name, string? Description);
+public record CreatePlannedSessionRequest(string Name, string? Description, string? Zone, string? Category);
 public record UpdateCountRequest(decimal CountedQuantity);
 
 public record PickingOrderDto(

@@ -15,6 +15,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Item> Items => Set<Item>();
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
+    public DbSet<PartnerApiKey> PartnerApiKeys => Set<PartnerApiKey>();
+    public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<TenantBranding> TenantBrandings => Set<TenantBranding>();
+    public DbSet<WaveBatch> WaveBatches => Set<WaveBatch>();
     public DbSet<InventoryStock> InventoryStocks => Set<InventoryStock>();
     public DbSet<InventorySession> InventorySessions => Set<InventorySession>();
     public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
@@ -110,8 +115,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.DeviceId, x.ClientOperationId }).IsUnique();
+            e.HasIndex(x => new { x.DeviceId, x.IdempotencyKey }).IsUnique();
             e.HasIndex(x => x.Status);
             e.Property(x => x.ClientOperationId).HasMaxLength(100);
+            e.Property(x => x.IdempotencyKey).HasMaxLength(200);
             e.Property(x => x.OperationType).HasMaxLength(100);
             e.HasOne(x => x.Device).WithMany(d => d.SyncOperations).HasForeignKey(x => x.DeviceId);
         });
@@ -141,6 +148,60 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
             e.Property(x => x.BarcodeType).HasMaxLength(50);
             e.Property(x => x.UnitOfMeasure).HasMaxLength(50);
             e.HasOne(x => x.Tenant).WithMany(t => t.Items).HasForeignKey(x => x.TenantId);
+        });
+
+        modelBuilder.Entity<WebhookSubscription>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.EventType });
+            e.HasIndex(x => new { x.TenantId, x.IsActive });
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.EventType).HasMaxLength(100);
+            e.Property(x => x.Url).HasMaxLength(500);
+            e.Property(x => x.Secret).HasMaxLength(200);
+            e.Property(x => x.LastError).HasMaxLength(500);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+        });
+
+        modelBuilder.Entity<PartnerApiKey>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.IsActive });
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Key).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+        });
+
+        modelBuilder.Entity<TenantSubscription>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.PlanCode });
+            e.Property(x => x.PlanCode).HasMaxLength(100);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+        });
+
+        modelBuilder.Entity<TenantBranding>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.TenantId).IsUnique();
+            e.Property(x => x.CompanyName).HasMaxLength(200);
+            e.Property(x => x.LogoUrl).HasMaxLength(500);
+            e.Property(x => x.PrimaryColor).HasMaxLength(20);
+            e.Property(x => x.SecondaryColor).HasMaxLength(20);
+            e.Property(x => x.FaviconUrl).HasMaxLength(500);
+            e.Property(x => x.WelcomeMessage).HasMaxLength(500);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
+        });
+
+        modelBuilder.Entity<WaveBatch>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.Name });
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.OrdersJson).HasMaxLength(2000);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
         });
 
         modelBuilder.Entity<InventoryStock>(e =>

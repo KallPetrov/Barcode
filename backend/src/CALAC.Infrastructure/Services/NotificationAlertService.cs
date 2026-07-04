@@ -41,4 +41,36 @@ public class NotificationAlertService(AppDbContext db, AuditService audit)
         await db.SaveChangesAsync(ct);
         await audit.LogAsync(tenantId, "ALERT_READ", userId, null, "NotificationAlert", alert.Id.ToString(), "Alert marked as read", null, ct);
     }
+
+    public async Task<IReadOnlyList<NotificationAlertDto>> CreateExpiryAlertsAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
+    {
+        var threshold = DateTime.UtcNow.AddDays(7);
+        var soonToExpire = await db.InventoryStocks
+            .Where(s => s.TenantId == tenantId && s.ExpiryDate.HasValue && s.ExpiryDate.Value <= threshold && s.Quantity > 0)
+            .Include(s => s.Item)
+            .OrderBy(s => s.ExpiryDate)
+            .ToListAsync(ct);
+
+        foreach (var stock in soonToExpire)
+        {
+            var alertKey = $"expiry:{stock.ItemId}:{stock.ExpiryDate:yyyy-MM-dd}";
+            var alreadyExists = await db.NotificationAlerts.AnyAsync(a =>
+                a.TenantId == tenantId &&
+                a.Title == "Expiry alert" &&
+                a.Message.Contains(alertKey, System.StringComparison.OrdinalIgnoreCase), ct);
+
+            if (alreadyExists)
+                continue;
+
+            await CreateAsync(
+                tenantId,
+                "Expiry alert",
+                $"{alertKey} | Партида за {stock.Item.Sku} изтича на {stock.ExpiryDate:yyyy-MM-dd}",
+                AlertLevel.Warning,
+                userId,
+                ct);
+        }
+
+        return await ListAsync(tenantId, ct);
+    }
 }

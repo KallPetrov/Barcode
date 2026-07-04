@@ -1,11 +1,23 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.19.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.20.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 
-**CALAC** е модерна, високопроизводителна модулна платформа, проектирана за индустриална работа с баркод скенери и PDA устройства (**Zebra, Honeywell, Datalogic**). Системата осигурява пълен контрол върху складовите процеси, проследяемост на наличностите и оптимизация на логистичните операции.
+**CALAC** е модулна WMS/warehouse execution платформа за складове, 3PL оператори и e-commerce fulfillment центрове. Към момента проектът е надграден от базовия прототип до работеща backend-ориентирана система с реални складови процеси, интеграции и SaaS подготовка.
+
+---
+
+## 📌 Текущо състояние (2026-07-04)
+
+CALAC вече включва:
+- **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;
+- **основни складови процеси** — локации, артикули, приемане, трансфери, picking, задачи;
+- **по-напреднали операции** — planned cycle counting, batch/wave picking, FEFO/FIFO workflow и expiry alerts;
+- **интеграционен слой** — webhooks, partner API ключове, ERP-ориентирана структура и SignalR нотификации;
+- **SaaS readiness** — self-service onboarding и активиране на tenant subscription plan;
+- **оперативна инфраструктура** — OpenTelemetry, Docker, PWA admin panel и ZPL/Labelary поддръжка.
 
 ---
 
@@ -13,43 +25,40 @@
 
 | Компонент | Технологии |
 |-----------|------------|
-| **Backend** | ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white) ![C#](https://img.shields.io/badge/C%23-239120?logo=c-sharp&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white) ![Entity Framework](https://img.shields.io/badge/EF%20Core-512BD4?logo=dotnet&logoColor=white) |
-| **Admin Panel** | ![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white) ![PWA](https://img.shields.io/badge/PWA-5A0FC8?logo=pwa&logoColor=white) |
-| **Mobile Application** | ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white) ![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white) |
-| **Infrastructure** | ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white) ![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-000000?logo=opentelemetry&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/CI/CD-2088FF?logo=github-actions&logoColor=white) |
+| **Backend** | .NET 8, C#, ASP.NET Core Web API, EF Core, PostgreSQL/SQLite, JWT, SignalR |
+| **Admin Panel** | React, TypeScript, Vite, PWA |
+| **Mobile Application** | Kotlin, Android, PDA-ready workflow |
+| **Infrastructure** | Docker, OpenTelemetry, Prometheus, GitHub Actions |
 
 ---
 
 ## 📦 Реализирани модули
 
-Платформата е изградена на модулен принцип, като към момента са напълно функционални следните направления:
+### 🔐 Сигурност и основа
+- JWT автентикация и refresh token ротация
+- RBAC за Admin, Supervisor и Operator
+- Multi-tenancy с tenant isolation
+- Audit log за критични операции
 
-### 🔐 1. Сигурност и Основа
-- **JWT Автентикация:** Поддръжка на стандартен вход и бърз достъп чрез PIN.
-- **Refresh Token Rotation:** Автоматично обновяване на сесиите и сигурно отписване.
-- **RBAC:** Управление на потребители и роли (Admin, Supervisor, Operator).
-- **Multi-tenancy:** Пълна изолация на данните на ниво база данни чрез Global Query Filters.
-- **Audit Log:** Детайлно проследяване на всяко действие в системата.
+### 🏗️ Складови процеси
+- Управление на локации и артикули
+- Goods receipt и internal transfers
+- Picking с FEFO/FIFO логика
+- Управление на задачи и операторски workflow
+- Planned cycle counting по зона/категория
+- Batch и wave picking
 
-### 🏗️ 2. Складова Инфраструктура
-- **Управление на Локации:** Йерархична структура (Зона, Ред, Рафт, Ниво, Позиция).
-- **Номенклатура Артикули:** Поддръжка на SKU, баркодове (1D/2D), мерни единици и тегло.
-- **ZPL Печат:** Генерация и печат на етикети за артикули и локации (Zebra стандарт).
-- **Labelary Интеграция:** Визуализация на етикети директно в админ панела.
+### 🔄 Интеграции и мониторинг
+- Webhook subscriptions за ERP/външни системи
+- Partner API ключове
+- SignalR нотификации в реално време
+- OpenTelemetry метрики и monitoring
+- ZPL/Labelary етикети за печат
 
-### ⚙️ 3. Оперативни Модули
-- **Инвентаризация:** Управление на сесии, частични и пълни инвентаризации, Cycle Counting.
-- **Приемане на стоки (Goods Receipt):** Заприходяване срещу документи с проверка на количества.
-- **Вътрешни Трансфери:** Преместване на стока между складови локации.
-- **Комисиониране (Picking):** Оптимизиран workflow със стратегии **FEFO (First-Expired, First-Out)** и **FIFO**.
-- **Управление на Задачи:** Разпределение на задачи към оператори с приоритети и статуси в реално време.
-
-### 🔄 4. Интеграция и Мониторинг
-- **ERP Адаптер:** Базова интеграция с Odoo и Dynamics 365.
-- **Offline Sync:** Опашка за операции при липса на мрежа с Last-Write-Wins стратегия.
-- **Real-time Нотификации:** Сигнализация чрез SignalR за критични складови събития.
-- **Телеметрия:** Мониторинг на метрики чрез OpenTelemetry и Prometheus.
-- **PWA Поддръжка:** Админ панелът може да бъде инсталиран като мобилно приложение.
+### ☁️ SaaS подготовка
+- Self-service tenant onboarding
+- Tenant subscription plan activation
+- Подготовка за по-нататъшно billing и white-label разширение
 
 ---
 
@@ -57,22 +66,23 @@
 
 ```text
 CALAC/
-├── backend/           # .NET 8 REST API (Clean Architecture)
-├── admin/             # React 19 админ панел (Vite + TypeScript)
-├── mobile/android/    # Kotlin PDA приложение (Room DB + Retrofit)
-├── docs/              # Техническа документация и изисквания
+├── backend/           # .NET 8 REST API и бизнес логика
+├── admin/             # React + TypeScript админ панел
+├── mobile/android/    # Kotlin PDA/mobile приложение
+├── docs/              # Техническа документация и roadmap
 ├── CHANGELOG.md       # История на версиите
-└── docker-compose.yml # Инфраструктура (PostgreSQL, Redis, Prometheus)
+├── ROADMAP.md         # Текуща продуктова стратегия
+└── docker-compose.yml # Инфраструктура и dev среда
 ```
 
 ---
 
 ## 🛠️ Системни изисквания
 
-- **Backend:** .NET 8 SDK
-- **Frontend:** Node.js 20+ & NPM
-- **Database:** PostgreSQL (чрез Docker)
-- **Mobile:** Android Studio & PDA устройство (Zebra/Honeywell)
+- Backend: .NET 8 SDK
+- Frontend: Node.js 20+ и npm
+- Database: PostgreSQL или SQLite за локално развитие
+- Mobile: Android Studio и PDA устройство
 
 ---
 
@@ -89,27 +99,34 @@ cd backend
 dotnet restore
 dotnet run --project src/CALAC.Api
 ```
-- **Swagger UI:** `http://localhost:5000/swagger`
+- Swagger UI: http://localhost:5000/swagger
 
-### 3. Админ Панел
+### 3. Админ панел
 ```bash
 cd admin
 npm install
 npm run dev
 ```
-- **URL:** `http://localhost:5173`
+- URL: http://localhost:5173
 
 ---
 
-## 📈 План за развитие
+## 🗺️ Документация
 
-- [ ] **AI Optimization:** Прогнозиране на наличности.
-- [ ] **Voice Picking:** Гласови напътствия за оператори.
-- [ ] **3D Warehouse Map:** Визуализация на склада.
-- [ ] **Advanced Analytics:** BI табла за мениджмънта.
-
-Подробна история на промените можете да намерите в [CHANGELOG.md](./CHANGELOG.md).
+- [ROADMAP.md](./ROADMAP.md) — текуща продуктова стратегия и приоритети
+- [CHANGELOG.md](./CHANGELOG.md) — история на промените
+- [docs/product-roadmap/roadmap.md](./docs/product-roadmap/roadmap.md) — допълнителен roadmap преглед
+- [docs/Readme-New_systema.md](./docs/Readme-New_systema.md) — по-широко описание на системата
+- [docs/moduli-new_system.md](./docs/moduli-new_system.md) — модулна структура
 
 ---
+
+## 🔭 Следващи приоритети
+
+- Stripe billing и lifecycle на планове
+- White-label branding за tenants
+- Voice picking за PDA устройства
+- Route optimization за picking
+- Advanced analytics и AI-assisted recommendations
 
 © 2026 CALAC Platform. Всички права запазени.

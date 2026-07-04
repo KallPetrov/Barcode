@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Moq;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using System.Net;
+using System.Net.Http;
 
 namespace CALAC.Tests;
 
@@ -149,13 +152,240 @@ public class BusinessLogicTests
     }
 
     [Fact]
+    public async Task ItemService_ListAsync_AppliesPaginationAndSearch()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new ItemService(db, audit);
+        var tenantId = Guid.NewGuid();
+
+        db.Items.AddRange(
+            new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "ALPHA-1", Name = "Alpha One", IsActive = true },
+            new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "ALPHA-2", Name = "Alpha Two", IsActive = true },
+            new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "BETA-1", Name = "Beta One", IsActive = true });
+        await db.SaveChangesAsync();
+
+        var result = await service.ListAsync(tenantId, page: 1, pageSize: 1, search: "ALPHA", sortBy: "sku", sortDirection: "asc");
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Equal("ALPHA-1", result.Items[0].Sku);
+    }
+
+    [Fact]
+    public async Task WebhookSubscriptionService_PublishAsync_SendsPayloadToActiveSubscriptions()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var handler = new StubHandler((request, cancellationToken) =>
+        {
+            Assert.Equal("https://example.test/webhook", request.RequestUri!.ToString());
+            Assert.Equal("application/json", request.Content!.Headers.ContentType!.MediaType);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        var httpClient = new HttpClient(handler);
+        var service = new WebhookSubscriptionService(db, audit, httpClient);
+
+        var tenantId = Guid.NewGuid();
+        var subscription = await service.CreateAsync(tenantId, new CreateWebhookSubscriptionRequest("Picking completed", "PICKING_COMPLETED", "https://example.test/webhook", "secret", true), Guid.NewGuid());
+
+        await service.PublishAsync(tenantId, "PICKING_COMPLETED", new { orderId = "123" });
+
+        var saved = await db.WebhookSubscriptions.FirstAsync(s => s.Id == subscription.Id);
+        Assert.True(saved.LastSuccessAt.HasValue);
+        Assert.Null(saved.LastError);
+    }
+
+    [Fact]
+    public async Task TenantOnboardingService_CreateAsync_CreatesTenantAndAdmin()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new TenantOnboardingService(db, audit);
+
+        var result = await service.CreateAsync(new CreateTenantOnboardingRequest("Acme Warehouse", "ACME", "admin", "Welcome123!", "Jane Admin"), Guid.NewGuid());
+
+        Assert.NotNull(result);
+        Assert.Equal("Acme Warehouse", result.TenantName);
+        Assert.Equal("admin", result.AdminUsername);
+
+        var tenant = await db.Tenants.FirstAsync(t => t.Id == result.TenantId);
+        Assert.True(tenant.IsActive);
+
+        var user = await db.Users.FirstAsync(u => u.TenantId == tenant.Id);
+        Assert.Equal("admin", user.Username);
+        Assert.True(BCrypt.Net.BCrypt.Verify("Welcome123!", user.PasswordHash));
+    }
+
+    [Fact]
+    public async Task PartnerApiKeyService_CreateAndValidateAsync_Works()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new PartnerApiKeyService(db, audit);
+
+        var tenantId = Guid.NewGuid();
+        var created = await service.CreateAsync(tenantId, new CreatePartnerApiKeyRequest("E-commerce", "partner-ecom"), Guid.NewGuid());
+
+        Assert.NotNull(created.Key);
+        Assert.StartsWith("pk_", created.Key);
+
+        Assert.True(await service.ValidateAsync(tenantId, created.Key));
+        Assert.False(await service.ValidateAsync(tenantId, "pk_invalid"));
+    }
+
+    [Fact]
+    public async Task ForecastingService_GetForecastAsync_ReturnsWeightedAverage()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new ForecastingService(db, audit);
+        var tenantId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "FC-1", Name = "Forecast Item" };
+        var location = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "FC-LOC", Name = "Forecast Loc" };
+        db.Items.Add(item);
+        db.Locations.Add(location);
+        db.InventoryStocks.AddRange(
+            new InventoryStock { Id = Guid.NewGuid(), TenantId = tenantId, ItemId = item.Id, LocationId = location.Id, Quantity = 10, CreatedAt = DateTime.UtcNow.AddDays(-3) },
+            new InventoryStock { Id = Guid.NewGuid(), TenantId = tenantId, ItemId = item.Id, LocationId = location.Id, Quantity = 20, CreatedAt = DateTime.UtcNow.AddDays(-2) },
+            new InventoryStock { Id = Guid.NewGuid(), TenantId = tenantId, ItemId = item.Id, LocationId = location.Id, Quantity = 30, CreatedAt = DateTime.UtcNow.AddDays(-1) });
+        await db.SaveChangesAsync();
+
+        var forecast = await service.GetForecastAsync(tenantId, item.Id, 3, 0.5m);
+
+        Assert.Equal(25m, forecast.ExpectedDemand);
+    }
+
+    [Fact]
+    public async Task BatchPickingService_CreateWaveAsync_GroupsOrdersByLocation()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new BatchPickingService(db, audit);
+        var tenantId = Guid.NewGuid();
+
+        var locationA = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "A1", Name = "A1" };
+        var locationB = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "B1", Name = "B1" };
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "BP-1", Name = "Batch Item" };
+        db.Locations.AddRange(locationA, locationB);
+        db.Items.Add(item);
+        await db.SaveChangesAsync();
+
+        var order1 = new PickingOrder { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Wave 1", Status = PickingOrderStatus.Draft };
+        var order2 = new PickingOrder { Id = Guid.NewGuid(), TenantId = tenantId, Name = "Wave 2", Status = PickingOrderStatus.Draft };
+        db.PickingOrders.AddRange(order1, order2);
+        db.PickingOrderLines.AddRange(
+            new PickingOrderLine { Id = Guid.NewGuid(), TenantId = tenantId, PickingOrderId = order1.Id, ItemId = item.Id, SourceLocationId = locationA.Id, Quantity = 2 },
+            new PickingOrderLine { Id = Guid.NewGuid(), TenantId = tenantId, PickingOrderId = order2.Id, ItemId = item.Id, SourceLocationId = locationB.Id, Quantity = 3 });
+        await db.SaveChangesAsync();
+
+        var wave = await service.CreateWaveAsync(tenantId, new CreateBatchWaveRequest("Batch Wave", new[] { order1.Id, order2.Id }), Guid.NewGuid());
+
+        Assert.Equal("Batch Wave", wave.Name);
+        Assert.Equal(2, wave.Orders.Count);
+        Assert.Equal(2, wave.Groups.Count);
+    }
+
+    [Fact]
+    public async Task NotificationAlertService_CreateExpiryAlertsAsync_DoesNotDuplicateForSameItem()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new NotificationAlertService(db, audit);
+        var tenantId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "EXP-1", Name = "Expiring Item" };
+        var location = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "E1", Name = "E1" };
+        db.Items.Add(item);
+        db.Locations.Add(location);
+        db.InventoryStocks.Add(new InventoryStock { Id = Guid.NewGuid(), TenantId = tenantId, ItemId = item.Id, LocationId = location.Id, Quantity = 5, ExpiryDate = DateTime.UtcNow.AddDays(3) });
+        await db.SaveChangesAsync();
+
+        await service.CreateExpiryAlertsAsync(tenantId, Guid.NewGuid());
+        await service.CreateExpiryAlertsAsync(tenantId, Guid.NewGuid());
+
+        var alerts = await db.NotificationAlerts.Where(a => a.TenantId == tenantId).ToListAsync();
+        Assert.Single(alerts);
+    }
+
+    [Fact]
+    public async Task TenantBrandingService_UpsertAsync_SavesBrandingSettings()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new TenantBrandingService(db, audit);
+        var tenantId = Guid.NewGuid();
+
+        var created = await service.GetOrCreateAsync(tenantId);
+        Assert.Equal("CALAC", created.CompanyName);
+
+        var updated = await service.UpsertAsync(tenantId, new UpsertTenantBrandingRequest("Acme Warehouse", "/logo.png", "#123456", "#654321", "/favicon.ico", "Welcome to Acme"), Guid.NewGuid());
+
+        Assert.Equal("Acme Warehouse", updated.CompanyName);
+        Assert.Equal("#123456", updated.PrimaryColor);
+        Assert.Equal("Welcome to Acme", updated.WelcomeMessage);
+
+        var persisted = await db.TenantBrandings.FirstAsync(b => b.TenantId == tenantId);
+        Assert.Equal("Acme Warehouse", persisted.CompanyName);
+    }
+
+    [Fact]
+    public async Task SubscriptionService_ActivatePlan_SetsTenantPlanAndExpiry()
+    {
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var service = new SubscriptionService(db, audit);
+        var tenantId = Guid.NewGuid();
+
+        var result = await service.ActivatePlanAsync(tenantId, new ActivateSubscriptionRequest("starter", 30), Guid.NewGuid());
+
+        Assert.Equal("starter", result.PlanCode);
+        Assert.True(result.IsActive);
+        Assert.True(result.ExpiresAt > DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task SyncService_PushAsync_IsIdempotentForSameKey()
+    {
+        // Arrange
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var inventory = new InventoryService(db, audit);
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var service = new SyncService(db, audit, inventory, serviceProvider);
+
+        var tenantId = Guid.NewGuid();
+        var deviceId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-IDEM", Name = "Sync Item", IsActive = true };
+        var location = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "LOC-IDEM", Name = "Sync Loc", IsActive = true };
+        db.Items.Add(item);
+        db.Locations.Add(location);
+        await db.SaveChangesAsync();
+
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, location.Id, 2, null, null, null));
+        var operations = new List<SyncOperationItem>
+        {
+            new SyncOperationItem("op-idem", "STOCK_ADD", payload, DateTime.UtcNow, 1)
+        };
+        var request = new SyncPushRequest(operations);
+
+        // Act
+        var first = await service.PushAsync(tenantId, deviceId, Guid.NewGuid(), request, "idem-123");
+        var second = await service.PushAsync(tenantId, deviceId, Guid.NewGuid(), request, "idem-123");
+
+        // Assert
+        Assert.True(first.Results[0].Success);
+        Assert.True(second.Results[0].Success);
+        Assert.Single(await db.SyncOperations.Where(s => s.DeviceId == deviceId).ToListAsync());
+    }
+
+    [Fact]
     public async Task SyncService_ProcessOperation_AddsStockCorrectly()
     {
         // Arrange
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
         var inventory = new InventoryService(db, audit.Object);
-        var service = new SyncService(db, audit.Object, inventory);
+        var service = new SyncService(db, audit.Object, inventory, new ServiceCollection().BuildServiceProvider());
 
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-S", Name = "Sync Item", IsActive = true };
@@ -179,5 +409,10 @@ public class BusinessLogicTests
         var stock = await db.InventoryStocks.FirstOrDefaultAsync(s => s.ItemId == item.Id && s.BatchNumber == "B1");
         Assert.NotNull(stock);
         Assert.Equal(5, stock.Quantity);
+    }
+
+    private sealed class StubHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => handler(request, cancellationToken);
     }
 }

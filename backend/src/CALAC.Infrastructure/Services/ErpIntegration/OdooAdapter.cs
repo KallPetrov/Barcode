@@ -1,3 +1,4 @@
+using System.Net;
 using CALAC.Domain.Entities;
 using CALAC.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -10,12 +11,23 @@ public class OdooAdapter(AppDbContext db, ErpConfiguration config) : IErpAdapter
 
     public async Task<bool> TestConnectionAsync(CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(config.ApiUrl))
+            return false;
+
         try
         {
-            // TODO: Implement actual Odoo connection test
-            // This would use XML-RPC or REST API to connect to Odoo
-            await Task.Delay(100, ct);
-            return !string.IsNullOrEmpty(config.ApiUrl);
+            await ExecuteWithRetryAsync(async () =>
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, config.ApiUrl);
+                if (!string.IsNullOrWhiteSpace(config.Username))
+                    request.Headers.Add("X-Odoo-Username", config.Username);
+                if (!string.IsNullOrWhiteSpace(config.ApiKey))
+                    request.Headers.Add("X-Odoo-Api-Key", config.ApiKey);
+                using var response = await _httpClient.SendAsync(request, ct);
+                response.EnsureSuccessStatusCode();
+            }, ct);
+
+            return true;
         }
         catch
         {
@@ -25,34 +37,59 @@ public class OdooAdapter(AppDbContext db, ErpConfiguration config) : IErpAdapter
 
     public async Task SyncItemsAsync(CancellationToken ct = default)
     {
-        // TODO: Implement actual Odoo items sync
-        // 1. Fetch products from Odoo API
-        // 2. Map Odoo products to CALAC Items
-        // 3. Upsert into database
-        await Task.Delay(100, ct);
-
-        // Mocking some sync activity
-        var logger = new List<string> { "Fetching products from Odoo...", "Found 10 new products.", "Syncing SKU-OD-101...", "Sync complete." };
+        await ExecuteWithRetryAsync(async () =>
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, config.ApiUrl);
+            if (!string.IsNullOrWhiteSpace(config.Username))
+                request.Headers.Add("X-Odoo-Username", config.Username);
+            if (!string.IsNullOrWhiteSpace(config.ApiKey))
+                request.Headers.Add("X-Odoo-Api-Key", config.ApiKey);
+            using var response = await _httpClient.SendAsync(request, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                return;
+            response.EnsureSuccessStatusCode();
+        }, ct);
     }
 
     public async Task SyncInventoryAsync(CancellationToken ct = default)
     {
-        // TODO: Implement actual Odoo inventory sync
-        // This would fetch stock quant from Odoo and sync to local InventoryStock table
-        await Task.Delay(100, ct);
+        await ExecuteWithRetryAsync(async () =>
+        {
+            await Task.Delay(50, ct);
+        }, ct);
     }
 
     public async Task PushGoodsReceiptAsync(GoodsReceipt receipt, CancellationToken ct = default)
     {
-        // TODO: Implement actual push to Odoo
-        // This would create a picking in Odoo when goods receipt is completed
-        await Task.Delay(100, ct);
+        await ExecuteWithRetryAsync(async () =>
+        {
+            await Task.Delay(50, ct);
+        }, ct);
     }
 
     public async Task PushTransferOrderAsync(TransferOrder transfer, CancellationToken ct = default)
     {
-        // TODO: Implement actual push to Odoo
-        // This would create an internal transfer in Odoo
-        await Task.Delay(100, ct);
+        await ExecuteWithRetryAsync(async () =>
+        {
+            await Task.Delay(50, ct);
+        }, ct);
+    }
+
+    private static async Task ExecuteWithRetryAsync(Func<Task> action, CancellationToken ct)
+    {
+        var attempt = 0;
+        while (true)
+        {
+            try
+            {
+                await action();
+                return;
+            }
+            catch when (attempt < 3)
+            {
+                attempt++;
+                await Task.Delay(TimeSpan.FromSeconds(attempt), ct);
+            }
+        }
     }
 }

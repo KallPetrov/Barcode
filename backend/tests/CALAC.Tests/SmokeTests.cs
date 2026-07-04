@@ -41,6 +41,16 @@ public class SmokeTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task GetRootHealth_ReturnsOk()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/health");
+        response.EnsureSuccessStatusCode();
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("healthy", content);
+    }
+
+    [Fact]
     public async Task Login_WithInvalidCredentials_ReturnsUnauthorized()
     {
         var client = _factory.CreateClient();

@@ -82,6 +82,7 @@ public class SyncOperation : ITenantEntity
     public Guid TenantId { get; set; }
     public Guid DeviceId { get; set; }
     public string ClientOperationId { get; set; } = string.Empty;
+    public string? IdempotencyKey { get; set; }
     public string OperationType { get; set; } = string.Empty;
     public string PayloadJson { get; set; } = "{}";
     public SyncOperationStatus Status { get; set; } = SyncOperationStatus.Pending;
@@ -136,6 +137,77 @@ public class Item : ITenantEntity
     public Tenant Tenant { get; set; } = null!;
     public ICollection<InventoryStock> InventoryStocks { get; set; } = [];
     public ICollection<InventoryCount> InventoryCounts { get; set; } = [];
+}
+
+public class WaveBatch : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string OrdersJson { get; set; } = "[]";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+}
+
+public class TenantSubscription : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string PlanCode { get; set; } = "starter";
+    public bool IsActive { get; set; } = true;
+    public DateTime? ExpiresAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+    public Tenant Tenant { get; set; } = null!;
+}
+
+public class TenantBranding : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string CompanyName { get; set; } = "CALAC";
+    public string? LogoUrl { get; set; }
+    public string PrimaryColor { get; set; } = "#2563eb";
+    public string SecondaryColor { get; set; } = "#0f172a";
+    public string? FaviconUrl { get; set; }
+    public string? WelcomeMessage { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+    public Tenant Tenant { get; set; } = null!;
+}
+
+public class WebhookSubscription : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string EventType { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
+    public string? Secret { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime? LastSuccessAt { get; set; }
+    public string? LastError { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+    public Tenant Tenant { get; set; } = null!;
+}
+
+public class PartnerApiKey : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Key { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastUsedAt { get; set; }
+
+    public Tenant Tenant { get; set; } = null!;
 }
 
 public class InventoryStock : ITenantEntity

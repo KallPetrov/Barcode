@@ -11,19 +11,31 @@ public class KpiReportingService(AppDbContext db)
         var workTasks = await db.WorkTasks.Where(x => x.TenantId == tenantId).ToListAsync(ct);
         var sessions = await db.InventorySessions.Where(x => x.TenantId == tenantId).ToListAsync(ct);
         var picks = await db.PickingOrders.Where(x => x.TenantId == tenantId).ToListAsync(ct);
+        var inventory = await db.InventoryStocks.Where(x => x.TenantId == tenantId).ToListAsync(ct);
+
+        var completedTasks = workTasks.Count(x => x.Status == WorkTaskStatus.Completed);
+        var totalTasks = workTasks.Count;
+        var completedPickings = picks.Count(x => x.Status == PickingOrderStatus.Completed);
+        var totalPickings = picks.Count;
+        var pickingAccuracy = totalPickings == 0 ? 0m : Math.Round((decimal)completedPickings / totalPickings * 100m, 2);
+        var inventoryTurnover = inventory.Count == 0 ? 0m : Math.Round(inventory.Sum(x => x.Quantity) / inventory.Count, 2);
+        var avgCompletionDays = workTasks.Where(x => x.Status == WorkTaskStatus.Completed && x.CompletedAt.HasValue)
+            .Select(x => (x.CompletedAt!.Value - x.CreatedAt).Days)
+            .DefaultIfEmpty(0)
+            .Average();
 
         return new
         {
-            totalTasks = workTasks.Count,
-            completedTasks = workTasks.Count(x => x.Status == WorkTaskStatus.Completed),
+            totalTasks,
+            completedTasks,
             overdueTasks = workTasks.Count(x => x.Status != WorkTaskStatus.Completed && x.DueDate < DateTime.UtcNow),
             activeSessions = sessions.Count(x => x.Status == InventorySessionStatus.InProgress),
             completedSessions = sessions.Count(x => x.Status == InventorySessionStatus.Completed),
-            completedPickings = picks.Count(x => x.Status == PickingOrderStatus.Completed),
-            averageCompletionDays = workTasks.Where(x => x.Status == WorkTaskStatus.Completed && x.CompletedAt.HasValue)
-                .Select(x => (x.CompletedAt!.Value - x.CreatedAt).Days)
-                .DefaultIfEmpty(0)
-                .Average()
+            completedPickings,
+            totalPickings,
+            pickingAccuracy,
+            inventoryTurnover,
+            averageCompletionDays = Math.Round(avgCompletionDays, 2)
         };
     }
 }

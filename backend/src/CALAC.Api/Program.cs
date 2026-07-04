@@ -89,6 +89,13 @@ builder.Services.AddScoped<KpiReportingService>();
 builder.Services.AddScoped<ReminderService>();
 builder.Services.AddScoped<OperatorActionHistoryService>();
 builder.Services.AddScoped<SlaService>();
+builder.Services.AddScoped<TenantOnboardingService>();
+builder.Services.AddScoped<PartnerApiKeyService>();
+builder.Services.AddScoped<ForecastingService>();
+builder.Services.AddScoped<BatchPickingService>();
+builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<TenantBrandingService>();
+builder.Services.AddHttpClient<WebhookSubscriptionService>();
 builder.Services.AddScoped<IZplService, ZplService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is required.");
@@ -124,7 +131,11 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
-    await DbSeeder.SeedAsync(db);
+
+    if (!app.Environment.IsProduction())
+    {
+        await DbSeeder.SeedAsync(db);
+    }
 }
 
 if (app.Environment.IsDevelopment())

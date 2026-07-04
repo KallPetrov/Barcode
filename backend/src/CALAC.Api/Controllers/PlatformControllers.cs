@@ -132,6 +132,8 @@ public class SyncController(SyncService sync, DeviceService devices) : Controlle
             return BadRequest(new { error = "Няма операции за синхронизация" });
 
         var hardwareId = Request.Headers["X-Device-Id"].FirstOrDefault();
+        var idempotencyKey = Request.Headers["Idempotency-Key"].FirstOrDefault()
+            ?? Request.Headers["X-Idempotency-Key"].FirstOrDefault();
         if (string.IsNullOrEmpty(hardwareId))
             return BadRequest(new { error = "Липсва X-Device-Id header" });
 
@@ -141,7 +143,7 @@ public class SyncController(SyncService sync, DeviceService devices) : Controlle
         if (device is null)
             return NotFound(new { error = "Устройството не е регистрирано" });
 
-        var result = await sync.PushAsync(TenantId, device.Id, UserId, request, ct);
+        var result = await sync.PushAsync(TenantId, device.Id, UserId, request, idempotencyKey, ct);
         return Ok(result);
     }
 
@@ -227,6 +229,131 @@ public class ErpWebhooksController(ItemService items, InventoryService inventory
 }
 
 [ApiController]
+[Route("api/batch-picking")]
+[Authorize(Roles = "Admin,Supervisor")]
+public class BatchPickingController(BatchPickingService batchPicking) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+
+    [HttpPost("waves")]
+    public async Task<ActionResult<BatchWaveDto>> CreateWave([FromBody] CreateBatchWaveRequest request, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await batchPicking.CreateWaveAsync(TenantId, request, UserId, ct));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+}
+
+[ApiController]
+[Route("api/tenant-branding")]
+[Authorize(Roles = "Admin,Supervisor")]
+public class TenantBrandingController(TenantBrandingService branding) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+
+    [HttpGet]
+    public async Task<ActionResult<TenantBrandingDto>> Get(CancellationToken ct)
+        => Ok(await branding.GetOrCreateAsync(TenantId, ct));
+
+    [HttpPut]
+    public async Task<ActionResult<TenantBrandingDto>> Upsert([FromBody] UpsertTenantBrandingRequest request, CancellationToken ct)
+        => Ok(await branding.UpsertAsync(TenantId, request, UserId, ct));
+}
+
+[ApiController]
+[Route("api/subscriptions")]
+[Authorize(Roles = "Admin,Supervisor")]
+public class SubscriptionController(SubscriptionService subscriptions) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+
+    [HttpPost("activate")]
+    public async Task<ActionResult<SubscriptionDto>> Activate([FromBody] ActivateSubscriptionRequest request, CancellationToken ct)
+        => Ok(await subscriptions.ActivatePlanAsync(TenantId, request, UserId, ct));
+}
+
+[ApiController]
+[Route("api/forecasting")]
+[Authorize(Roles = "Admin,Supervisor")]
+public class ForecastingController(ForecastingService forecasting) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+
+    [HttpGet("items/{itemId:guid}")]
+    public async Task<ActionResult<ForecastResult>> Get(Guid itemId, [FromQuery] int lookbackPeriods = 3, [FromQuery] decimal smoothingFactor = 0.5m, CancellationToken ct = default)
+    {
+        try
+        {
+            return Ok(await forecasting.GetForecastAsync(TenantId, itemId, lookbackPeriods, smoothingFactor, ct));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+}
+
+[ApiController]
+[Route("api/partner/api-keys")]
+[Authorize(Roles = "Admin,Supervisor")]
+public class PartnerApiKeysController(PartnerApiKeyService keys) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+
+    [HttpPost]
+    public async Task<ActionResult<PartnerApiKeyDto>> Create([FromBody] CreatePartnerApiKeyRequest request, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await keys.CreateAsync(TenantId, request, UserId, ct));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+}
+
+[ApiController]
+[Route("api/webhooks/subscriptions")]
+[Authorize(Roles = "Admin,Supervisor")]
+public class WebhookSubscriptionsController(WebhookSubscriptionService subscriptions, AuditService audit) : ControllerBase
+{
+    private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
+    private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<WebhookSubscriptionDto>>> List(CancellationToken ct)
+    {
+        var items = await subscriptions.ListAsync(TenantId, ct);
+        return Ok(items);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<WebhookSubscriptionDto>> Create([FromBody] CreateWebhookSubscriptionRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var item = await subscriptions.CreateAsync(TenantId, request, UserId, ct);
+            return CreatedAtAction(nameof(List), new { id = item.Id }, item);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+}
+
+[ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "Admin,Supervisor")]
 public class DashboardController(DeviceService devices, WorkTaskService workTasks, NotificationAlertService alerts, AppDbContext db) : ControllerBase
@@ -303,8 +430,9 @@ public class DashboardController(DeviceService devices, WorkTaskService workTask
 public class HealthController : ControllerBase
 {
     [HttpGet]
+    [HttpGet("~/health")]
     [AllowAnonymous]
-    public IActionResult Get() => Ok(new { status = "healthy", service = "CALAC.Api" });
+    public IActionResult Get() => Ok(new { status = "healthy", service = "CALAC.Api", timestamp = DateTime.UtcNow });
 }
 
 [ApiController]
@@ -426,8 +554,8 @@ public class ItemsController(ItemService itemService) : ControllerBase
     private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ItemDto>>> List(CancellationToken ct) =>
-        Ok(await itemService.ListAsync(TenantId, ct));
+    public async Task<ActionResult<PagedResult<ItemDto>>> List([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null, [FromQuery] string? sortBy = "sku", [FromQuery] string? sortDirection = "asc", CancellationToken ct = default) =>
+        Ok(await itemService.ListAsync(TenantId, page, pageSize, search, sortBy, sortDirection, ct));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ItemDto>> Get(Guid id, CancellationToken ct)
@@ -564,6 +692,14 @@ public class InventorySessionsController(InventorySessionService sessionService)
     public async Task<ActionResult<InventorySessionDto>> Create([FromBody] CreateSessionRequest request, CancellationToken ct)
     {
         var session = await sessionService.CreateAsync(TenantId, request, UserId, ct);
+        return CreatedAtAction(nameof(Get), new { id = session.Id }, session);
+    }
+
+    [HttpPost("planned")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<ActionResult<InventorySessionDto>> CreatePlanned([FromBody] CreatePlannedSessionRequest request, CancellationToken ct)
+    {
+        var session = await sessionService.CreatePlannedAsync(TenantId, request, UserId, ct);
         return CreatedAtAction(nameof(Get), new { id = session.Id }, session);
     }
 
@@ -975,6 +1111,11 @@ public class AlertsController(NotificationAlertService alertService) : Controlle
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<NotificationAlertDto>>> List(CancellationToken ct)
         => Ok(await alertService.ListAsync(TenantId, ct));
+
+    [HttpPost("expiry-check")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<ActionResult<IReadOnlyList<NotificationAlertDto>>> ExpiryCheck(CancellationToken ct)
+        => Ok(await alertService.CreateExpiryAlertsAsync(TenantId, UserId, ct));
 
     [HttpPost]
     [Authorize(Roles = "Admin,Supervisor")]
