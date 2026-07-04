@@ -42,6 +42,16 @@ api.interceptors.response.use(
   }
 );
 
+export interface TenantSubscription {
+  id: string;
+  tenantId: string;
+  planCode: string;
+  isActive: boolean;
+  expiresAt?: string;
+  stripeSubscriptionId?: string;
+  stripeCustomerId?: string;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -837,5 +847,20 @@ export async function getItemLabel(id: string, qty: number = 1) {
 
 export async function getLocationLabel(id: string) {
   const { data } = await api.get<string>(`/api/labels/location/${id}`);
+  return data;
+}
+
+export async function getSubscription() {
+  const { data } = await api.get<TenantSubscription>('/api/billing/subscription');
+  return data;
+}
+
+export async function createCheckoutSession(payload: { planCode: string; successUrl: string; cancelUrl: string }) {
+  const { data } = await api.post<{ url: string }>('/api/billing/checkout', payload);
+  return data;
+}
+
+export async function createPortalSession(payload: { returnUrl: string }) {
+  const { data } = await api.post<{ url: string }>('/api/billing/portal', payload);
   return data;
 }

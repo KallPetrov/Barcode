@@ -6,6 +6,15 @@
 
 ---
 
+## [0.31.0] - 2026-07-16
+
+### Добавено
+- Интеграция на Stripe SDK за управление на абонаменти и плащания.
+- BillingController с ендпойнти за Checkout, Customer Portal и Webhooks.
+- SubscriptionMiddleware за Feature Gating (ограничаване на достъпа според плана).
+- Нова страница "Абонамент" в админ панела.
+- Разширен модел на TenantSubscription със Stripe идентификатори.
+
 ## [0.30.0] - 2026-07-15
 
 ### Добавено
