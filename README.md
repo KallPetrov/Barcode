@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.36.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.37.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 
@@ -15,7 +15,8 @@ CALAC вече включва:
 - **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;
 - **основни складови процеси** — локации, артикули, приемане, трансфери, picking, задачи;
 - **по-напреднали операции** — planned cycle counting, batch/wave picking, FEFO/FIFO/LIFO/FPFO workflow и expiry alerts;
-- **интеграционен слой** — webhooks, partner API ключове, ERP-ориентирана структура и SignalR нотификации;
+- **производство** — BOM управление, работни поръчки и batch genealogy проследимост;
+- **интеграционен слой** — GS1-128 баркод парсване, webhooks, partner API ключове и SignalR;
 - **SaaS readiness** — self-service onboarding и активиране на tenant subscription plan;
 - **оперативна инфраструктура** — OpenTelemetry, Docker, PWA admin panel и ZPL/Labelary поддръжка.
 

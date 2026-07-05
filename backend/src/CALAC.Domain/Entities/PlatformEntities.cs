@@ -157,6 +157,78 @@ public class WaveBatch : ITenantEntity
     public Tenant Tenant { get; set; } = null!;
 }
 
+public class BillOfMaterial : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid FinishedItemId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal FinishedQuantity { get; set; } = 1;
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+    public Item FinishedItem { get; set; } = null!;
+    public ICollection<BomLine> Lines { get; set; } = [];
+}
+
+public class BomLine : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid BillOfMaterialId { get; set; }
+    public Guid ComponentItemId { get; set; }
+    public decimal Quantity { get; set; }
+
+    public Tenant Tenant { get; set; } = null!;
+    public BillOfMaterial BillOfMaterial { get; set; } = null!;
+    public Item ComponentItem { get; set; } = null!;
+}
+
+public enum WorkOrderStatus
+{
+    Draft = 0,
+    Released = 1,
+    InProgress = 2,
+    Completed = 3,
+    Cancelled = 4
+}
+
+public class WorkOrder : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string OrderNumber { get; set; } = string.Empty;
+    public Guid BillOfMaterialId { get; set; }
+    public decimal PlannedQuantity { get; set; }
+    public decimal ProducedQuantity { get; set; }
+    public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Draft;
+    public DateTime? StartedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+    public BillOfMaterial BillOfMaterial { get; set; } = null!;
+    public ICollection<WorkOrderConsumption> Consumptions { get; set; } = [];
+}
+
+public class WorkOrderConsumption : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid WorkOrderId { get; set; }
+    public Guid ComponentItemId { get; set; }
+    public Guid InventoryStockId { get; set; } // The specific batch/location consumed
+    public decimal Quantity { get; set; }
+    public DateTime ConsumedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+    public WorkOrder WorkOrder { get; set; } = null!;
+    public InventoryStock InventoryStock { get; set; } = null!;
+    public Guid? ProducedInventoryStockId { get; set; } // Link to the finished product stock record
+    public InventoryStock? ProducedInventoryStock { get; set; }
+}
+
 public class CourierConfiguration : ITenantEntity
 {
     public Guid Id { get; set; }

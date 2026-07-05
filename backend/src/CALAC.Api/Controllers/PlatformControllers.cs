@@ -681,6 +681,10 @@ public class InventoryController(InventoryService inventoryService) : Controller
     public async Task<ActionResult<IReadOnlyList<InventoryStockDto>>> ListStock(CancellationToken ct) =>
         Ok(await inventoryService.ListStockAsync(TenantId, ct));
 
+    [HttpGet("identify/{barcode}")]
+    public async Task<ActionResult<CALAC.Infrastructure.Services.Barcode.BarcodeData>> Identify(string barcode) =>
+        Ok(await inventoryService.IdentifyBarcodeAsync(barcode));
+
     [HttpPost("stock")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<ActionResult<InventoryStockDto>> AddStock([FromBody] AddStockRequest request, CancellationToken ct)

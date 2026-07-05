@@ -17,6 +17,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
     public DbSet<Item> Items => Set<Item>();
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
     public DbSet<PartnerApiKey> PartnerApiKeys => Set<PartnerApiKey>();
+    public DbSet<BillOfMaterial> BillOfMaterials => Set<BillOfMaterial>();
+    public DbSet<BomLine> BomLines => Set<BomLine>();
+    public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<WorkOrderConsumption> WorkOrderConsumptions => Set<WorkOrderConsumption>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
     public DbSet<TenantBranding> TenantBrandings => Set<TenantBranding>();
     public DbSet<WaveBatch> WaveBatches => Set<WaveBatch>();

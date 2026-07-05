@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using CALAC.Infrastructure.Services.Logistics;
+using CALAC.Infrastructure.Services.Barcode;
 using System.Net;
 using System.Net.Http;
 
@@ -30,7 +31,7 @@ public class BusinessLogicTests
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
         var sp = new ServiceCollection().BuildServiceProvider();
-        var service = new InventoryService(db, audit.Object, sp);
+        var service = new InventoryService(db, audit.Object, sp, new Gs1Parser());
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "TEST-1", Name = "Test Item" };
         var location = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "LOC-1", Name = "Loc 1" };
@@ -362,7 +363,7 @@ public class BusinessLogicTests
         using var db = CreateDbContext();
         var audit = new AuditService(db);
         var sp = new ServiceCollection().BuildServiceProvider();
-        var inventory = new InventoryService(db, audit, sp);
+        var inventory = new InventoryService(db, audit, sp, new Gs1Parser());
         var serviceProvider = sp;
         var service = new SyncService(db, audit, inventory, serviceProvider);
 
@@ -398,7 +399,7 @@ public class BusinessLogicTests
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
         var sp = new ServiceCollection().BuildServiceProvider();
-        var inventory = new InventoryService(db, audit.Object, sp);
+        var inventory = new InventoryService(db, audit.Object, sp, new Gs1Parser());
         var service = new SyncService(db, audit.Object, inventory, sp);
 
         var tenantId = Guid.NewGuid();
@@ -477,7 +478,7 @@ public class BusinessLogicTests
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
         var sp = new ServiceCollection().BuildServiceProvider();
-        var inventory = new InventoryService(db, audit.Object, sp);
+        var inventory = new InventoryService(db, audit.Object, sp, new Gs1Parser());
         var serviceProvider = sp;
         var service = new SyncService(db, audit.Object, inventory, serviceProvider);
 
@@ -515,7 +516,7 @@ public class BusinessLogicTests
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
         var sp = new ServiceCollection().BuildServiceProvider();
-        var inventory = new InventoryService(db, audit.Object, sp);
+        var inventory = new InventoryService(db, audit.Object, sp, new Gs1Parser());
         var serviceProvider = sp;
         var service = new SyncService(db, audit.Object, inventory, serviceProvider);
 

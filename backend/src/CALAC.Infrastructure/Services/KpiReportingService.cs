@@ -32,6 +32,21 @@ public class KpiReportingService(AppDbContext db)
         var expiredStockValue = inventory.Where(x => x.Status == StockStatus.Expired).Sum(x => x.Quantity);
         var quarantinedStockValue = inventory.Where(x => x.Status == StockStatus.Quarantined).Sum(x => x.Quantity);
 
+        var slowMovingThreshold = DateTime.UtcNow.AddMonths(-3);
+        var expiryRiskThreshold = DateTime.UtcNow.AddDays(30);
+
+        var slowMovingItems = inventory
+            .Where(s => s.Quantity > 0 && (!s.UpdatedAt.HasValue || s.UpdatedAt < slowMovingThreshold))
+            .GroupBy(s => s.ItemId)
+            .Select(g => new { ItemId = g.Key, Quantity = g.Sum(x => x.Quantity) })
+            .ToList();
+
+        var expiryRiskItems = inventory
+            .Where(s => s.Quantity > 0 && s.ExpiryDate.HasValue && s.ExpiryDate < expiryRiskThreshold)
+            .GroupBy(s => s.ItemId)
+            .Select(g => new { ItemId = g.Key, Quantity = g.Sum(x => x.Quantity) })
+            .ToList();
+
         return new
         {
             totalTasks,
@@ -47,7 +62,9 @@ public class KpiReportingService(AppDbContext db)
             totalOverrideCount,
             pickingComplianceRate = complianceRate,
             expiredStockQuantity = expiredStockValue,
-            quarantinedStockQuantity = quarantinedStockValue
+            quarantinedStockQuantity = quarantinedStockValue,
+            slowMovingItemCount = slowMovingItems.Count,
+            expiryRiskItemCount = expiryRiskItems.Count
         };
     }
 }

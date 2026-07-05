@@ -3,6 +3,7 @@ using System;
 using CALAC.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CALAC.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260705105640_AddManufacturingModule")]
+    partial class AddManufacturingModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -1845,9 +1848,6 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<Guid>("InventoryStockId")
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("ProducedInventoryStockId")
-                        .HasColumnType("TEXT");
-
                     b.Property<decimal>("Quantity")
                         .HasColumnType("TEXT");
 
@@ -1860,8 +1860,6 @@ namespace CALAC.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InventoryStockId");
-
-                    b.HasIndex("ProducedInventoryStockId");
 
                     b.HasIndex("TenantId");
 
@@ -2591,10 +2589,6 @@ namespace CALAC.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("CALAC.Domain.Entities.InventoryStock", "ProducedInventoryStock")
-                        .WithMany()
-                        .HasForeignKey("ProducedInventoryStockId");
-
                     b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -2608,8 +2602,6 @@ namespace CALAC.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("InventoryStock");
-
-                    b.Navigation("ProducedInventoryStock");
 
                     b.Navigation("Tenant");
 
