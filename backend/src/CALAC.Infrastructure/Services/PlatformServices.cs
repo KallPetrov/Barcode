@@ -1115,8 +1115,13 @@ public record UpdateItemRequest(string Sku, string Name, string? Description, st
 
 public record InventoryStockDto(Guid Id, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal Quantity, decimal? ReservedQuantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate, DateTime? ProductionDate, DateTime? BestBeforeDate, DateTime? ReceiptDate, string Status, DateTime CreatedAt, DateTime? UpdatedAt);
 
-public class InventoryService(AppDbContext db, AuditService audit, IServiceProvider serviceProvider)
+public class InventoryService(AppDbContext db, AuditService audit, IServiceProvider serviceProvider, CALAC.Infrastructure.Services.Barcode.IBarcodeParser barcodeParser)
 {
+    public async Task<CALAC.Infrastructure.Services.Barcode.BarcodeData> IdentifyBarcodeAsync(string barcode)
+    {
+        return await Task.FromResult(barcodeParser.Parse(barcode));
+    }
+
     public async Task<IReadOnlyList<InventoryStockDto>> ListStockAsync(Guid tenantId, CancellationToken ct = default) =>
         await db.InventoryStocks
             .Include(s => s.Item)
