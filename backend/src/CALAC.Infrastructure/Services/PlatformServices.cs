@@ -13,9 +13,9 @@ using CALAC.Infrastructure.Services.Logistics;
 
 namespace CALAC.Infrastructure.Services;
 
-public record AuthResult(bool Success, string? Token, string? RefreshToken, UserDto? User, string? Error);
+public record AuthResult(bool Success, string? Token, string? RefreshToken, UserDto? User, string? Error, bool MustChangePassword = false);
 
-public record UserDto(Guid Id, string Username, string FullName, UserRole Role, Guid TenantId, string TenantName);
+public record UserDto(Guid Id, string Username, string FullName, UserRole Role, Guid TenantId, string TenantName, bool MustChangePassword);
 
 public class AuthService(AppDbContext db, IConfiguration config)
 {
@@ -34,7 +34,7 @@ public class AuthService(AppDbContext db, IConfiguration config)
         var dto = ToDto(user);
         var token = GenerateToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id, ct);
-        return new AuthResult(true, token, refreshToken, dto, null);
+        return new AuthResult(true, token, refreshToken, dto, null, user.MustChangePassword);
     }
 
     public async Task<AuthResult> LoginWithPinAsync(string username, string pin, CancellationToken ct = default)
@@ -68,7 +68,7 @@ public class AuthService(AppDbContext db, IConfiguration config)
 
         var token = GenerateToken(user);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id, ct);
-        return new AuthResult(true, token, refreshToken, ToDto(user), null);
+        return new AuthResult(true, token, refreshToken, ToDto(user), null, user.MustChangePassword);
     }
 
     public async Task<AuthResult> RefreshTokenAsync(string token, CancellationToken ct = default)
@@ -83,7 +83,7 @@ public class AuthService(AppDbContext db, IConfiguration config)
         var newRefreshToken = await RotateRefreshTokenAsync(refreshToken, ct);
         var jwtToken = GenerateToken(refreshToken.User);
 
-        return new AuthResult(true, jwtToken, newRefreshToken, ToDto(refreshToken.User), null);
+        return new AuthResult(true, jwtToken, newRefreshToken, ToDto(refreshToken.User), null, refreshToken.User.MustChangePassword);
     }
 
     public async Task RevokeTokenAsync(string token, CancellationToken ct = default)
@@ -108,7 +108,8 @@ public class AuthService(AppDbContext db, IConfiguration config)
             new(JwtRegisteredClaimNames.UniqueName, user.Username),
             new(ClaimTypes.Role, user.Role.ToString()),
             new("tenant_id", user.TenantId.ToString()),
-            new("full_name", user.FullName)
+            new("full_name", user.FullName),
+            new("must_change_password", user.MustChangePassword.ToString().ToLower())
         };
 
         var token = new JwtSecurityToken(
@@ -154,8 +155,19 @@ public class AuthService(AppDbContext db, IConfiguration config)
         return newToken;
     }
 
+    public async Task<bool> ChangePasswordAsync(Guid userId, string newPassword, CancellationToken ct = default)
+    {
+        var user = await db.Users.FindAsync([userId], ct);
+        if (user is null) return false;
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        user.MustChangePassword = false;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     private static UserDto ToDto(User user) =>
-        new(user.Id, user.Username, user.FullName, user.Role, user.TenantId, user.Tenant.Name);
+        new(user.Id, user.Username, user.FullName, user.Role, user.TenantId, user.Tenant.Name, user.MustChangePassword);
 }
 
 public record AuditLogDto(
@@ -790,8 +802,18 @@ public class SyncService(
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (transferLineReq != null)
                 {
+                    var lineId = Guid.Parse(syncOp.ClientOperationId);
+                    var existingLine = await db.TransferOrderLines.IgnoreQueryFilters().FirstOrDefaultAsync(l => l.Id == lineId && l.TenantId == tenantId, ct);
+                    if (existingLine != null && syncOp.Version > 0 && syncOp.Version <= existingLine.Version)
+                    {
+                        if (syncOp.ClientTimestamp.HasValue && existingLine.UpdatedAt.HasValue && syncOp.ClientTimestamp.Value < existingLine.UpdatedAt.Value)
+                        {
+                            return;
+                        }
+                    }
+
                     var transferService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<TransferService>(serviceProvider);
-                    await transferService.UpdateLineAsync(tenantId, Guid.Parse(syncOp.ClientOperationId), transferLineReq, userId ?? Guid.Empty, ct);
+                    await transferService.UpdateLineAsync(tenantId, lineId, transferLineReq, userId ?? Guid.Empty, ct);
                 }
                 break;
             case "PICKING_LINE_UPDATE":
@@ -824,7 +846,7 @@ public class UserManagementService(AppDbContext db, AuditService audit)
             .Include(u => u.Tenant)
             .Where(u => u.TenantId == tenantId)
             .OrderBy(u => u.Username)
-            .Select(u => new UserDto(u.Id, u.Username, u.FullName, u.Role, u.TenantId, u.Tenant.Name))
+            .Select(u => new UserDto(u.Id, u.Username, u.FullName, u.Role, u.TenantId, u.Tenant.Name, u.MustChangePassword))
             .ToListAsync(ct);
 
     public async Task<UserDto> CreateAsync(Guid tenantId, CreateUserRequest request, Guid adminId, CancellationToken ct = default)
@@ -842,7 +864,8 @@ public class UserManagementService(AppDbContext db, AuditService audit)
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             PinHash = request.Pin is not null ? BCrypt.Net.BCrypt.HashPassword(request.Pin) : null,
             FullName = request.FullName,
-            Role = request.Role
+            Role = request.Role,
+            MustChangePassword = true
         };
 
         db.Users.Add(user);
@@ -851,7 +874,7 @@ public class UserManagementService(AppDbContext db, AuditService audit)
             $"Username={user.Username}", null, ct);
 
         var tenant = await db.Tenants.FindAsync([tenantId], ct);
-        return new UserDto(user.Id, user.Username, user.FullName, user.Role, user.TenantId, tenant!.Name);
+        return new UserDto(user.Id, user.Username, user.FullName, user.Role, user.TenantId, tenant!.Name, user.MustChangePassword);
     }
 }
 
@@ -2245,6 +2268,8 @@ public class TransferService(AppDbContext db, AuditService audit)
 
         line.MovedQuantity = request.MovedQuantity;
         line.MovedAt = DateTime.UtcNow;
+        line.UpdatedAt = DateTime.UtcNow;
+        line.Version++;
 
         await db.SaveChangesAsync(ct);
         await audit.LogAsync(tenantId, "TRANSFER_LINE_UPDATED", userId, null, "TransferOrderLine", line.Id.ToString(),

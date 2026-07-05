@@ -16,7 +16,8 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
     public record LoginRequest(string Username, string Password);
     public record PinLoginRequest(string Username, string Pin);
     public record RefreshTokenRequest(string RefreshToken);
-    public record LoginResponse(string Token, string RefreshToken, UserDto User);
+    public record ChangePasswordRequest(string NewPassword);
+    public record LoginResponse(string Token, string RefreshToken, UserDto User, bool MustChangePassword);
 
     [HttpPost("login")]
     [AllowAnonymous]
@@ -29,7 +30,7 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
         await audit.LogAsync(result.User!.TenantId, "LOGIN", result.User.Id, null, "User", result.User.Id.ToString(),
             null, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
 
-        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User));
+        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User, result.MustChangePassword));
     }
 
     [HttpPost("login/pin")]
@@ -43,7 +44,7 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
         await audit.LogAsync(result.User!.TenantId, "LOGIN_PIN", result.User.Id, null, "User", result.User.Id.ToString(),
             null, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
 
-        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User));
+        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User, result.MustChangePassword));
     }
 
     [HttpPost("refresh")]
@@ -54,7 +55,21 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
         if (!result.Success)
             return Unauthorized(new { error = result.Error });
 
-        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User!));
+        return Ok(new LoginResponse(result.Token!, result.RefreshToken!, result.User!, result.MustChangePassword));
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+        var result = await auth.ChangePasswordAsync(userId, request.NewPassword, ct);
+        if (!result) return NotFound();
+
+        await audit.LogAsync(Guid.Parse(User.FindFirstValue("tenant_id")!), "PASSWORD_CHANGED", userId, null, "User", userId.ToString(),
+            null, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
+
+        return Ok();
     }
 
     [HttpPost("logout")]
@@ -67,15 +82,20 @@ public class AuthController(AuthService auth, AuditService audit) : ControllerBa
 
     [HttpGet("me")]
     [Authorize]
-    public ActionResult<UserDto> Me()
+    public async Task<ActionResult<UserDto>> Me(CancellationToken ct, [FromServices] AppDbContext db)
     {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
+        var user = await db.Users.Include(u => u.Tenant).FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user == null) return NotFound();
+
         return Ok(new UserDto(
-            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!),
-            User.Identity!.Name!,
-            User.FindFirstValue("full_name") ?? "",
-            Enum.Parse<UserRole>(User.FindFirstValue(ClaimTypes.Role)!),
-            Guid.Parse(User.FindFirstValue("tenant_id")!),
-            ""));
+            user.Id,
+            user.Username,
+            user.FullName,
+            user.Role,
+            user.TenantId,
+            user.Tenant.Name,
+            user.MustChangePassword));
     }
 }
 

@@ -27,9 +27,12 @@ public class User : ITenantEntity
     public string FullName { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.Operator;
     public bool IsActive { get; set; } = true;
+    public bool MustChangePassword { get; set; }
     public int AccessFailedCount { get; set; }
     public DateTimeOffset? LockoutEnd { get; set; }
+    public int Version { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
 
     public Tenant Tenant { get; set; } = null!;
@@ -132,7 +135,9 @@ public class Item : ITenantEntity
     public decimal? Weight { get; set; }
     public string? UnitOfMeasure { get; set; }
     public bool IsActive { get; set; } = true;
+    public int Version { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public Tenant Tenant { get; set; } = null!;
     public ICollection<InventoryStock> InventoryStocks { get; set; } = [];
@@ -553,6 +558,9 @@ public class TransferOrderLine : ITenantEntity
     public decimal? MovedQuantity { get; set; }
     public DateTime? MovedAt { get; set; }
     public string? Notes { get; set; }
+    public int Version { get; set; } = 1;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public Tenant Tenant { get; set; } = null!;
     public TransferOrder TransferOrder { get; set; } = null!;

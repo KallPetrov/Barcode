@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getSubscription, createCheckoutSession, createPortalSession, TenantSubscription } from '../api/client';
+import { getSubscription, createCheckoutSession, createPortalSession } from '../api/client';
+import type { TenantSubscription } from '../api/client';
 import { Check, CreditCard, ExternalLink, Shield } from 'lucide-react';
 
 const BillingPage: React.FC = () => {

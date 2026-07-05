@@ -102,8 +102,12 @@ export interface DashboardStats {
 }
 
 export async function login(username: string, password: string) {
-  const { data } = await api.post<{ token: string; refreshToken: string; user: User }>('/api/auth/login', { username, password });
+  const { data } = await api.post<{ token: string; refreshToken: string; user: User & { mustChangePassword: boolean } }>('/api/auth/login', { username, password });
   return data;
+}
+
+export async function changePassword(password: string) {
+  await api.post('/api/auth/change-password', { newPassword: password });
 }
 
 export async function getMe() {

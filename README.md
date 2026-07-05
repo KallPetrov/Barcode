@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.33.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.34.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📌 Текущо състояние (2026-07-18)
+## 📌 Текущо състояние (2026-07-20)
 
 CALAC вече включва:
 - **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;
@@ -39,6 +39,7 @@ CALAC вече включва:
 - RBAC за Admin, Supervisor и Operator
 - Multi-tenancy с EF Core Global Filters
 - Audit log и Device Lockout защита
+- Задължителна смяна на парола и Rate Limiting защита
 
 ### 🏗️ Складови процеси
 - Управление на локации и артикули
@@ -86,7 +87,11 @@ CALAC/
 
 ---
 
-## 🚦 Бърз старт
+## 🚦 Бърз старт (Development Only)
+
+> [!WARNING]
+> Следните данни за вход са предназначени **само за разработка и демо цели**. В реална среда винаги използвайте силни пароли и задължително ги променете при първоначално влизане.
+
 
 ### 1. Инфраструктура
 ```bash

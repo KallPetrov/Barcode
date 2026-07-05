@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getEcommerceStores, getEcommerceOrders, syncEcommerceStore, EcommerceStore, EcommerceOrder } from '../api/client';
+import { getEcommerceStores, getEcommerceOrders, syncEcommerceStore } from '../api/client';
+import type { EcommerceStore, EcommerceOrder } from '../api/client';
 import { ShoppingCart, Store, RefreshCw, ExternalLink, Package } from 'lucide-react';
 
 export function EcommerceDashboardPage() {

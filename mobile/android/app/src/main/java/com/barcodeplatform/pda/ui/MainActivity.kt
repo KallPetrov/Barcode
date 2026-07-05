@@ -11,7 +11,7 @@ import android.os.Vibrator
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.barcodeplatform.pda.BarcodePlatformApp
+import com.barcodeplatform.pda.CalacApp
 import com.barcodeplatform.pda.databinding.ActivityMainBinding
 import com.barcodeplatform.pda.scanner.DataWedgeReceiver
 import kotlinx.coroutines.launch
@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        repo = (application as BarcodePlatformApp).repository
+        val repo = (application as CalacApp).repository
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

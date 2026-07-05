@@ -12,9 +12,22 @@ android {
         applicationId = "com.barcodeplatform.pda"
         minSdk = 23
         targetSdk = 35
-        versionCode = 33
-        versionName = "0.33.0"
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5000/\"")
+        versionCode = 34
+        versionName = "0.34.0"
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5000/\"")
+        }
+        create("prod") {
+            dimension = "environment"
+            buildConfigField("String", "API_BASE_URL", "\"https://api.calac.bg/\"")
+        }
     }
 
     buildFeatures {

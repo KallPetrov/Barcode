@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.barcodeplatform.pda.BarcodePlatformApp
+import com.barcodeplatform.pda.CalacApp
 import com.barcodeplatform.pda.databinding.ActivityLoginBinding
 import kotlinx.coroutines.launch
 
@@ -14,7 +14,7 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val repo = (application as BarcodePlatformApp).repository
+        val repo = (application as CalacApp).repository
 
         if (repo.isLoggedIn) {
             startActivity(Intent(this, MainActivity::class.java))
