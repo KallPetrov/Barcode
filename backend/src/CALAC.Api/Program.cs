@@ -102,6 +102,7 @@ builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<TenantBrandingService>();
 builder.Services.AddHttpClient<WebhookSubscriptionService>();
+builder.Services.AddScoped<ILabelTemplateEngine, LabelTemplateEngine>();
 builder.Services.AddScoped<IZplService, ZplService>();
 builder.Services.AddScoped<ICourierAdapter, EcontAdapter>();
 builder.Services.AddScoped<ICourierAdapter, SpeedyAdapter>();
@@ -109,6 +110,8 @@ builder.Services.AddScoped<ShippingService>();
 builder.Services.AddScoped<IEcommerceAdapter, WooCommerceAdapter>();
 builder.Services.AddScoped<IEcommerceAdapter, ShopifyAdapter>();
 builder.Services.AddScoped<EcommerceService>();
+builder.Services.AddScoped<CALAC.Infrastructure.Services.ErpIntegration.IErpAdapter, CALAC.Infrastructure.Services.ErpIntegration.OdooAdapter>();
+builder.Services.AddScoped<CALAC.Infrastructure.Services.ErpIntegration.IErpAdapter, CALAC.Infrastructure.Services.ErpIntegration.DynamicsAdapter>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is required.");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

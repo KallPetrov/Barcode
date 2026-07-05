@@ -125,6 +125,10 @@ export async function getDevices() {
   return data;
 }
 
+export async function revokeDevice(id: string) {
+  await api.post(`/api/devices/${id}/revoke`);
+}
+
 export async function getUsers() {
   const { data } = await api.get<User[]>('/api/users');
   return data;

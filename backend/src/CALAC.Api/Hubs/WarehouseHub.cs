@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 namespace CALAC.Api.Hubs;
 
 [Authorize]
-public class WarehouseHub : Hub
+public class WarehouseHub : CALAC.Infrastructure.Hubs.WarehouseHub
 {
     public override async Task OnConnectedAsync()
     {

@@ -135,6 +135,14 @@ public class DevicesController(DeviceService devices) : ControllerBase
         var device = await devices.GetAsync(TenantId, id, ct);
         return device is null ? NotFound() : Ok(device);
     }
+
+    [HttpPost("{id:guid}/revoke")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<IActionResult> Revoke(Guid id, CancellationToken ct)
+    {
+        var result = await devices.RevokeAsync(TenantId, id, UserId, ct);
+        return result ? Ok() : NotFound();
+    }
 }
 
 [ApiController]
@@ -162,6 +170,9 @@ public class SyncController(SyncService sync, DeviceService devices) : Controlle
 
         if (device is null)
             return NotFound(new { error = "Устройството не е регистрирано" });
+
+        if (device.Status == DeviceStatus.Maintenance)
+            return Forbid();
 
         var result = await sync.PushAsync(TenantId, device.Id, UserId, request, idempotencyKey, ct);
         return Ok(result);
@@ -447,12 +458,29 @@ public class DashboardController(DeviceService devices, WorkTaskService workTask
 
 [ApiController]
 [Route("api/[controller]")]
-public class HealthController : ControllerBase
+public class HealthController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
     [HttpGet("~/health")]
     [AllowAnonymous]
     public IActionResult Get() => Ok(new { status = "healthy", service = "CALAC.Api", timestamp = DateTime.UtcNow });
+
+    [HttpGet("pda-heartbeat")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<IActionResult> PdaHeartbeat(CancellationToken ct)
+    {
+        var threshold = DateTime.UtcNow.AddMinutes(-10);
+        var inactiveDevices = await db.Devices
+            .Where(d => d.Status == DeviceStatus.Online && (!d.LastSeenAt.HasValue || d.LastSeenAt.Value < threshold))
+            .Select(d => new { d.Id, d.Name, d.HardwareId, d.LastSeenAt })
+            .ToListAsync(ct);
+
+        return Ok(new {
+            status = inactiveDevices.Any() ? "Warning" : "Healthy",
+            inactiveCount = inactiveDevices.Count,
+            inactiveDevices
+        });
+    }
 }
 
 [ApiController]
