@@ -992,7 +992,7 @@ public class LocationService(AppDbContext db, AuditService audit)
 public record CreateLocationRequest(string Code, string Name, string? Zone, string? Aisle, string? Rack, string? Level, string? Position);
 public record UpdateLocationRequest(string Code, string Name, string? Zone, string? Aisle, string? Rack, string? Level, string? Position, bool IsActive);
 
-public record ItemDto(Guid Id, string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string DefaultPickingStrategy, bool IsActive, DateTime CreatedAt);
+public record ItemDto(Guid Id, string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string DefaultPickingStrategy, int? MinShelfLifeDays, bool IsActive, DateTime CreatedAt);
 public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
 
 public class ItemService(AppDbContext db, AuditService audit)
@@ -1019,7 +1019,7 @@ public class ItemService(AppDbContext db, AuditService audit)
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(i => new ItemDto(i.Id, i.Sku, i.Name, i.Description, i.Barcode, i.BarcodeType, i.ImageUrl, i.Weight, i.UnitOfMeasure, i.DefaultPickingStrategy.ToString(), i.IsActive, i.CreatedAt))
+            .Select(i => new ItemDto(i.Id, i.Sku, i.Name, i.Description, i.Barcode, i.BarcodeType, i.ImageUrl, i.Weight, i.UnitOfMeasure, i.DefaultPickingStrategy.ToString(), i.MinShelfLifeDays, i.IsActive, i.CreatedAt))
             .ToListAsync(ct);
 
         return new PagedResult<ItemDto>(items, totalCount, page, pageSize);
@@ -1028,13 +1028,13 @@ public class ItemService(AppDbContext db, AuditService audit)
     public async Task<ItemDto?> GetAsync(Guid tenantId, Guid id, CancellationToken ct = default)
     {
         var item = await db.Items.FirstOrDefaultAsync(i => i.Id == id && i.TenantId == tenantId, ct);
-        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
+        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.MinShelfLifeDays, item.IsActive, item.CreatedAt);
     }
 
     public async Task<ItemDto?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken ct = default)
     {
         var item = await db.Items.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Barcode == barcode, ct);
-        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
+        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.MinShelfLifeDays, item.IsActive, item.CreatedAt);
     }
 
     public async Task<ItemDto> CreateAsync(Guid tenantId, CreateItemRequest request, Guid userId, CancellationToken ct = default)
@@ -1055,6 +1055,7 @@ public class ItemService(AppDbContext db, AuditService audit)
             Weight = request.Weight,
             UnitOfMeasure = request.UnitOfMeasure,
             DefaultPickingStrategy = string.IsNullOrEmpty(request.DefaultPickingStrategy) ? PickingStrategy.FIFO : Enum.Parse<PickingStrategy>(request.DefaultPickingStrategy, true),
+            MinShelfLifeDays = request.MinShelfLifeDays,
             IsActive = true
         };
 
@@ -1063,7 +1064,7 @@ public class ItemService(AppDbContext db, AuditService audit)
         await audit.LogAsync(tenantId, "ITEM_CREATED", userId, null, "Item", item.Id.ToString(),
             $"Sku={item.Sku}", null, ct);
 
-        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
+        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.MinShelfLifeDays, item.IsActive, item.CreatedAt);
     }
 
     public async Task<ItemDto> UpdateAsync(Guid tenantId, Guid id, UpdateItemRequest request, Guid userId, CancellationToken ct = default)
@@ -1084,13 +1085,14 @@ public class ItemService(AppDbContext db, AuditService audit)
         item.Weight = request.Weight;
         item.UnitOfMeasure = request.UnitOfMeasure;
         item.DefaultPickingStrategy = string.IsNullOrEmpty(request.DefaultPickingStrategy) ? PickingStrategy.FIFO : Enum.Parse<PickingStrategy>(request.DefaultPickingStrategy, true);
+        item.MinShelfLifeDays = request.MinShelfLifeDays;
         item.IsActive = request.IsActive;
 
         await db.SaveChangesAsync(ct);
         await audit.LogAsync(tenantId, "ITEM_UPDATED", userId, null, "Item", item.Id.ToString(),
             $"Sku={item.Sku}", null, ct);
 
-        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
+        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.MinShelfLifeDays, item.IsActive, item.CreatedAt);
     }
 
     public async Task<bool> DeleteAsync(Guid tenantId, Guid id, Guid userId, CancellationToken ct = default)
@@ -1108,8 +1110,8 @@ public class ItemService(AppDbContext db, AuditService audit)
     }
 }
 
-public record CreateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string? DefaultPickingStrategy);
-public record UpdateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string? DefaultPickingStrategy, bool IsActive);
+public record CreateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string? DefaultPickingStrategy, int? MinShelfLifeDays);
+public record UpdateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string? DefaultPickingStrategy, int? MinShelfLifeDays, bool IsActive);
 
 public record InventoryStockDto(Guid Id, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal Quantity, decimal? ReservedQuantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate, DateTime? ProductionDate, DateTime? BestBeforeDate, DateTime? ReceiptDate, string Status, DateTime CreatedAt, DateTime? UpdatedAt);
 
@@ -1136,6 +1138,19 @@ public class InventoryService(AppDbContext db, AuditService audit, IServiceProvi
         var location = await db.Locations.IgnoreQueryFilters().FirstOrDefaultAsync(l => l.Id == request.LocationId && l.TenantId == tenantId, ct);
         if (location is null)
             throw new KeyNotFoundException("Локацията не е намерена");
+
+        if (request.ExpiryDate.HasValue)
+        {
+            if (request.ExpiryDate.Value <= DateTime.UtcNow)
+                throw new InvalidOperationException("Не може да се приема стока с изтекъл срок на годност");
+
+            if (item.MinShelfLifeDays.HasValue)
+            {
+                var remainingDays = (request.ExpiryDate.Value - DateTime.UtcNow).TotalDays;
+                if (remainingDays < item.MinShelfLifeDays.Value)
+                    throw new InvalidOperationException($"Стоката не отговаря на минималния остатъчен срок на годност ({item.MinShelfLifeDays.Value} дни)");
+            }
+        }
 
         var batchNumber = string.IsNullOrWhiteSpace(request.BatchNumber) ? null : request.BatchNumber.Trim();
         var serialNumber = string.IsNullOrWhiteSpace(request.SerialNumber) ? null : request.SerialNumber.Trim();
@@ -1238,7 +1253,17 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
             stockQuery = stockQuery.Where(s => s.Item != null && s.Item.Sku.Contains(request.Category));
         }
 
-        var stockList = await stockQuery.Include(s => s.Item).Include(s => s.Location).ToListAsync(ct);
+        if (request.PrioritizeNearExpiry)
+        {
+            var threshold = DateTime.UtcNow.AddDays(30);
+            stockQuery = stockQuery.Where(s => s.ExpiryDate.HasValue && s.ExpiryDate.Value <= threshold);
+        }
+
+        var stockList = await stockQuery
+            .Include(s => s.Item)
+            .Include(s => s.Location)
+            .OrderBy(s => s.ExpiryDate)
+            .ToListAsync(ct);
         foreach (var stock in stockList)
         {
             db.InventoryCounts.Add(new InventoryCount
@@ -1443,7 +1468,7 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
 }
 
 public record CreateSessionRequest(string Name, string? Description);
-public record CreatePlannedSessionRequest(string Name, string? Description, string? Zone, string? Category);
+public record CreatePlannedSessionRequest(string Name, string? Description, string? Zone, string? Category, bool PrioritizeNearExpiry = false);
 public record UpdateCountRequest(decimal CountedQuantity);
 
 public record PickingOrderDto(
@@ -1587,6 +1612,9 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
 
         foreach (var lineReq in request.Lines)
         {
+            // If the order strategy is FIFO/FEFO but the item has a specific preference, we might need more logic
+            // for wave picking. For a single order, we stick to the order strategy.
+
             var line = new PickingOrderLine
             {
                 TenantId = tenantId,

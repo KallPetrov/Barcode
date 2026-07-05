@@ -315,8 +315,8 @@ public class BusinessLogicTests
         await service.CreateExpiryAlertsAsync(tenantId, Guid.NewGuid());
 
         var alerts = await db.NotificationAlerts.Where(a => a.TenantId == tenantId).ToListAsync();
-        // Now returns 3 alerts because it hits 90, 30, and 7 day thresholds
-        Assert.Equal(3, alerts.Count);
+        // Now returns 4 alerts because it hits 90, 30, 15 and 7 day thresholds
+        Assert.Equal(4, alerts.Count);
     }
 
     [Fact]

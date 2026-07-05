@@ -54,7 +54,7 @@ public class NotificationAlertService(AppDbContext db, AuditService audit, IServ
     public async Task<IReadOnlyList<NotificationAlertDto>> CreateExpiryAlertsAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
     {
         var now = DateTime.UtcNow;
-        var thresholds = new[] { 90, 30, 7, 0 };
+        var thresholds = new[] { 90, 30, 15, 7, 0 };
 
         foreach (var days in thresholds)
         {
