@@ -1,4 +1,5 @@
 using CALAC.Domain.Entities;
+using CALAC.Domain.Enums;
 using CALAC.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,6 +25,13 @@ public class KpiReportingService(AppDbContext db)
             .DefaultIfEmpty(0)
             .Average();
 
+        var stockLines = await db.PickingStockLines.Where(x => x.TenantId == tenantId).ToListAsync(ct);
+        var totalOverrideCount = stockLines.Count(x => x.IsOverride);
+        var complianceRate = stockLines.Count == 0 ? 100m : Math.Round((decimal)(stockLines.Count - totalOverrideCount) / stockLines.Count * 100m, 2);
+
+        var expiredStockValue = inventory.Where(x => x.Status == StockStatus.Expired).Sum(x => x.Quantity);
+        var quarantinedStockValue = inventory.Where(x => x.Status == StockStatus.Quarantined).Sum(x => x.Quantity);
+
         return new
         {
             totalTasks,
@@ -35,7 +43,11 @@ public class KpiReportingService(AppDbContext db)
             totalPickings,
             pickingAccuracy,
             inventoryTurnover,
-            averageCompletionDays = Math.Round(avgCompletionDays, 2)
+            averageCompletionDays = Math.Round(avgCompletionDays, 2),
+            totalOverrideCount,
+            pickingComplianceRate = complianceRate,
+            expiredStockQuantity = expiredStockValue,
+            quarantinedStockQuantity = quarantinedStockValue
         };
     }
 }
