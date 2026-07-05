@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getShipments, generateWaybill, Shipment } from '../api/client';
+import { getShipments, generateWaybill } from '../api/client';
+import type { Shipment } from '../api/client';
 import { Package, Truck, ExternalLink, RefreshCw, Printer } from 'lucide-react';
 
 export function ShippingDashboardPage() {

@@ -422,4 +422,118 @@ public class BusinessLogicTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => handler(request, cancellationToken);
     }
+
+    [Fact]
+    public async Task InventoryService_FEFO_Picking_Suggested_Correctly()
+    {
+        // Arrange
+        using var db = CreateDbContext();
+        var audit = new Mock<AuditService>(db);
+        var alerts = new Mock<NotificationAlertService>(db, audit.Object);
+        var hub = new Mock<IHubContext<DynamicHubProxy>>();
+        var shippingLogger = new Mock<ILogger<ShippingService>>();
+        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
+        var service = new PickingService(db, audit.Object, alerts.Object, hub.Object, shippingService);
+
+        var tenantId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "FEFO-1", Name = "FEFO Item" };
+        var loc = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "L1", Name = "L1" };
+        db.Items.Add(item);
+        db.Locations.Add(loc);
+
+        // Stock A expires later
+        db.InventoryStocks.Add(new InventoryStock { Id = Guid.NewGuid(), TenantId = tenantId, ItemId = item.Id, LocationId = loc.Id, Quantity = 10, ExpiryDate = DateTime.UtcNow.AddDays(20), CreatedAt = DateTime.UtcNow });
+        // Stock B expires sooner
+        db.InventoryStocks.Add(new InventoryStock { Id = Guid.NewGuid(), TenantId = tenantId, ItemId = item.Id, LocationId = loc.Id, Quantity = 10, ExpiryDate = DateTime.UtcNow.AddDays(5), CreatedAt = DateTime.UtcNow });
+
+        await db.SaveChangesAsync();
+
+        var request = new CreatePickingOrderRequest("FEFO Order", "REF", "FEFO", null, "", new[] { new CreatePickingLineRequest(item.Id, null, null, 5, "") });
+        var orderDto = await service.CreateAsync(tenantId, request, Guid.NewGuid());
+
+        // Act
+        await service.StartAsync(tenantId, orderDto.Id, Guid.NewGuid());
+
+        // Assert
+        var order = await db.PickingOrders.Include(o => o.Lines).ThenInclude(l => l.StockLines).FirstAsync(o => o.Id == orderDto.Id);
+        var pickedStockId = order.Lines.First().StockLines.First().InventoryStockId;
+        var pickedStock = await db.InventoryStocks.FindAsync(pickedStockId);
+
+        Assert.Equal(DateTime.UtcNow.AddDays(5).Date, pickedStock!.ExpiryDate!.Value.Date);
+    }
+
+    [Fact]
+    public async Task SyncService_ConflictResolution_LastWriteWins_ClientTimestamp()
+    {
+        // Arrange
+        using var db = CreateDbContext();
+        var audit = new Mock<AuditService>(db);
+        var inventory = new InventoryService(db, audit.Object);
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var service = new SyncService(db, audit.Object, inventory, serviceProvider);
+
+        var tenantId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SYNC-1", Name = "Sync Item" };
+        var loc = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "L1", Name = "L1" };
+        db.Items.Add(item);
+        db.Locations.Add(loc);
+
+        // Initial stock at T0
+        var initialStock = new InventoryStock {
+            TenantId = tenantId, ItemId = item.Id, LocationId = loc.Id, Quantity = 10,
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-10), Version = 1
+        };
+        db.InventoryStocks.Add(initialStock);
+        await db.SaveChangesAsync();
+
+        // Operation from client at T-5 (newer than T-10)
+        var newerTimestamp = DateTime.UtcNow.AddMinutes(-5);
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, loc.Id, 5, null, null, null));
+        var op = new SyncOperationItem("sync-op-1", "STOCK_ADD", payload, newerTimestamp, 2);
+
+        // Act
+        await service.PushAsync(tenantId, Guid.NewGuid(), Guid.NewGuid(), new SyncPushRequest(new[] { op }));
+
+        // Assert
+        var stock = await db.InventoryStocks.FirstAsync(s => s.ItemId == item.Id);
+        Assert.Equal(15, stock.Quantity); // 10 + 5
+    }
+
+    [Fact]
+    public async Task SyncService_ConflictResolution_IgnoreOldUpdates()
+    {
+        // Arrange
+        using var db = CreateDbContext();
+        var audit = new Mock<AuditService>(db);
+        var inventory = new InventoryService(db, audit.Object);
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var service = new SyncService(db, audit.Object, inventory, serviceProvider);
+
+        var tenantId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SYNC-1", Name = "Sync Item" };
+        var loc = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "L1", Name = "L1" };
+        db.Items.Add(item);
+        db.Locations.Add(loc);
+
+        // Stock updated at T0
+        var lastUpdate = DateTime.UtcNow;
+        var initialStock = new InventoryStock {
+            TenantId = tenantId, ItemId = item.Id, LocationId = loc.Id, Quantity = 10,
+            UpdatedAt = lastUpdate, Version = 5
+        };
+        db.InventoryStocks.Add(initialStock);
+        await db.SaveChangesAsync();
+
+        // Operation from client at T-10 (older than T0)
+        var olderTimestamp = DateTime.UtcNow.AddMinutes(-10);
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, loc.Id, 5, null, null, null));
+        var op = new SyncOperationItem("sync-op-old", "STOCK_ADD", payload, olderTimestamp, 4);
+
+        // Act
+        await service.PushAsync(tenantId, Guid.NewGuid(), Guid.NewGuid(), new SyncPushRequest(new[] { op }));
+
+        // Assert
+        var stock = await db.InventoryStocks.FirstAsync(s => s.ItemId == item.Id);
+        Assert.Equal(10, stock.Quantity); // Should NOT change
+    }
 }

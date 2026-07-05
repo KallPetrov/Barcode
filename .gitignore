@@ -19,6 +19,8 @@ local.properties
 /captures/
 .externalNativeBuild/
 .cxx/
+**/build/
+**/.gradle/
 
 .DS_Store
 Thumbs.db

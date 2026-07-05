@@ -1,8 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { getMe, login as apiLogin, type User } from '../api/client';
 
+interface AuthUser extends User {
+  mustChangePassword?: boolean;
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
@@ -11,7 +15,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
