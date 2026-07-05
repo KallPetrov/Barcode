@@ -1,4 +1,5 @@
 using CALAC.Domain.Entities;
+using CALAC.Domain.Enums;
 using CALAC.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
@@ -52,33 +53,48 @@ public class NotificationAlertService(AppDbContext db, AuditService audit, IServ
 
     public async Task<IReadOnlyList<NotificationAlertDto>> CreateExpiryAlertsAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
     {
-        var threshold = DateTime.UtcNow.AddDays(7);
-        var soonToExpire = await db.InventoryStocks
-            .Where(s => s.TenantId == tenantId && s.ExpiryDate.HasValue && s.ExpiryDate.Value <= threshold && s.Quantity > 0)
-            .Include(s => s.Item)
-            .OrderBy(s => s.ExpiryDate)
-            .ToListAsync(ct);
+        var now = DateTime.UtcNow;
+        var thresholds = new[] { 90, 30, 7, 0 };
 
-        foreach (var stock in soonToExpire)
+        foreach (var days in thresholds)
         {
-            var alertKey = $"expiry:{stock.ItemId}:{stock.ExpiryDate:yyyy-MM-dd}";
-            var alreadyExists = await db.NotificationAlerts.AnyAsync(a =>
-                a.TenantId == tenantId &&
-                a.Title == "Expiry alert" &&
-                a.Message.Contains(alertKey, System.StringComparison.OrdinalIgnoreCase), ct);
+            var thresholdDate = now.AddDays(days);
+            var stocks = await db.InventoryStocks
+                .Where(s => s.TenantId == tenantId && s.ExpiryDate.HasValue && s.ExpiryDate.Value <= thresholdDate && s.Quantity > 0)
+                .Include(s => s.Item)
+                .ToListAsync(ct);
 
-            if (alreadyExists)
-                continue;
+            foreach (var stock in stocks)
+            {
+                var isExpired = stock.ExpiryDate!.Value <= now;
+                if (isExpired && stock.Status != StockStatus.Expired)
+                {
+                    stock.Status = StockStatus.Expired;
+                    await audit.LogAsync(tenantId, "STOCK_EXPIRED", userId, null, "InventoryStock", stock.Id.ToString(), $"Auto-blocked due to expiry: {stock.ExpiryDate:yyyy-MM-dd}", null, ct);
+                }
 
-            await CreateAsync(
-                tenantId,
-                "Expiry alert",
-                $"{alertKey} | Партида за {stock.Item.Sku} изтича на {stock.ExpiryDate:yyyy-MM-dd}",
-                AlertLevel.Warning,
-                userId,
-                ct);
+                var title = isExpired ? "Изтекъл срок на годност" : $"Наближаващ срок ({days} дни)";
+                var level = isExpired ? AlertLevel.Critical : (days <= 7 ? AlertLevel.Warning : AlertLevel.Info);
+                var alertKey = $"expiry:{stock.ItemId}:{stock.ExpiryDate:yyyy-MM-dd}:{days}";
+
+                var alreadyExists = await db.NotificationAlerts.AnyAsync(a =>
+                    a.TenantId == tenantId &&
+                    a.Title == title &&
+                    a.Message.Contains(alertKey, StringComparison.OrdinalIgnoreCase), ct);
+
+                if (alreadyExists) continue;
+
+                await CreateAsync(
+                    tenantId,
+                    title,
+                    $"{alertKey} | Артикул {stock.Item.Sku} (Партида: {stock.BatchNumber}) изтича на {stock.ExpiryDate:yyyy-MM-dd}",
+                    level,
+                    userId,
+                    ct);
+            }
         }
 
+        await db.SaveChangesAsync(ct);
         return await ListAsync(tenantId, ct);
     }
 }

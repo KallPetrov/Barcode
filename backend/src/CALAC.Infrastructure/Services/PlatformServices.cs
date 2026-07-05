@@ -848,7 +848,7 @@ public class SyncService(
                     }
 
                     var pickingService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<PickingService>(serviceProvider);
-                    await pickingService.UpdateStockLineAsync(tenantId, lineId, pickingLineReq.PickedQuantity, userId ?? Guid.Empty, ct);
+                    await pickingService.UpdateStockLineAsync(tenantId, lineId, pickingLineReq.PickedQuantity, userId ?? Guid.Empty, pickingLineReq.OverrideReason, ct);
                 }
                 break;
             default:
@@ -992,7 +992,7 @@ public class LocationService(AppDbContext db, AuditService audit)
 public record CreateLocationRequest(string Code, string Name, string? Zone, string? Aisle, string? Rack, string? Level, string? Position);
 public record UpdateLocationRequest(string Code, string Name, string? Zone, string? Aisle, string? Rack, string? Level, string? Position, bool IsActive);
 
-public record ItemDto(Guid Id, string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, bool IsActive, DateTime CreatedAt);
+public record ItemDto(Guid Id, string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string DefaultPickingStrategy, bool IsActive, DateTime CreatedAt);
 public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
 
 public class ItemService(AppDbContext db, AuditService audit)
@@ -1019,7 +1019,7 @@ public class ItemService(AppDbContext db, AuditService audit)
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(i => new ItemDto(i.Id, i.Sku, i.Name, i.Description, i.Barcode, i.BarcodeType, i.ImageUrl, i.Weight, i.UnitOfMeasure, i.IsActive, i.CreatedAt))
+            .Select(i => new ItemDto(i.Id, i.Sku, i.Name, i.Description, i.Barcode, i.BarcodeType, i.ImageUrl, i.Weight, i.UnitOfMeasure, i.DefaultPickingStrategy.ToString(), i.IsActive, i.CreatedAt))
             .ToListAsync(ct);
 
         return new PagedResult<ItemDto>(items, totalCount, page, pageSize);
@@ -1028,13 +1028,13 @@ public class ItemService(AppDbContext db, AuditService audit)
     public async Task<ItemDto?> GetAsync(Guid tenantId, Guid id, CancellationToken ct = default)
     {
         var item = await db.Items.FirstOrDefaultAsync(i => i.Id == id && i.TenantId == tenantId, ct);
-        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.IsActive, item.CreatedAt);
+        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
     }
 
     public async Task<ItemDto?> GetByBarcodeAsync(Guid tenantId, string barcode, CancellationToken ct = default)
     {
         var item = await db.Items.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.TenantId == tenantId && i.Barcode == barcode, ct);
-        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.IsActive, item.CreatedAt);
+        return item is null ? null : new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
     }
 
     public async Task<ItemDto> CreateAsync(Guid tenantId, CreateItemRequest request, Guid userId, CancellationToken ct = default)
@@ -1054,6 +1054,7 @@ public class ItemService(AppDbContext db, AuditService audit)
             ImageUrl = request.ImageUrl,
             Weight = request.Weight,
             UnitOfMeasure = request.UnitOfMeasure,
+            DefaultPickingStrategy = string.IsNullOrEmpty(request.DefaultPickingStrategy) ? PickingStrategy.FIFO : Enum.Parse<PickingStrategy>(request.DefaultPickingStrategy, true),
             IsActive = true
         };
 
@@ -1062,7 +1063,7 @@ public class ItemService(AppDbContext db, AuditService audit)
         await audit.LogAsync(tenantId, "ITEM_CREATED", userId, null, "Item", item.Id.ToString(),
             $"Sku={item.Sku}", null, ct);
 
-        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.IsActive, item.CreatedAt);
+        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
     }
 
     public async Task<ItemDto> UpdateAsync(Guid tenantId, Guid id, UpdateItemRequest request, Guid userId, CancellationToken ct = default)
@@ -1082,13 +1083,14 @@ public class ItemService(AppDbContext db, AuditService audit)
         item.ImageUrl = request.ImageUrl;
         item.Weight = request.Weight;
         item.UnitOfMeasure = request.UnitOfMeasure;
+        item.DefaultPickingStrategy = string.IsNullOrEmpty(request.DefaultPickingStrategy) ? PickingStrategy.FIFO : Enum.Parse<PickingStrategy>(request.DefaultPickingStrategy, true);
         item.IsActive = request.IsActive;
 
         await db.SaveChangesAsync(ct);
         await audit.LogAsync(tenantId, "ITEM_UPDATED", userId, null, "Item", item.Id.ToString(),
             $"Sku={item.Sku}", null, ct);
 
-        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.IsActive, item.CreatedAt);
+        return new ItemDto(item.Id, item.Sku, item.Name, item.Description, item.Barcode, item.BarcodeType, item.ImageUrl, item.Weight, item.UnitOfMeasure, item.DefaultPickingStrategy.ToString(), item.IsActive, item.CreatedAt);
     }
 
     public async Task<bool> DeleteAsync(Guid tenantId, Guid id, Guid userId, CancellationToken ct = default)
@@ -1106,10 +1108,10 @@ public class ItemService(AppDbContext db, AuditService audit)
     }
 }
 
-public record CreateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure);
-public record UpdateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, bool IsActive);
+public record CreateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string? DefaultPickingStrategy);
+public record UpdateItemRequest(string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, string? DefaultPickingStrategy, bool IsActive);
 
-public record InventoryStockDto(Guid Id, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal Quantity, decimal? ReservedQuantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate, DateTime CreatedAt, DateTime? UpdatedAt);
+public record InventoryStockDto(Guid Id, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal Quantity, decimal? ReservedQuantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate, DateTime? ProductionDate, DateTime? BestBeforeDate, DateTime? ReceiptDate, string Status, DateTime CreatedAt, DateTime? UpdatedAt);
 
 public class InventoryService(AppDbContext db, AuditService audit, IServiceProvider serviceProvider)
 {
@@ -1119,7 +1121,7 @@ public class InventoryService(AppDbContext db, AuditService audit, IServiceProvi
             .Include(s => s.Location)
             .Where(s => s.TenantId == tenantId)
             .OrderBy(s => s.Item.Name)
-            .Select(s => new InventoryStockDto(s.Id, s.ItemId, s.Item.Name, s.LocationId, s.Location.Name, s.Quantity, s.ReservedQuantity, s.BatchNumber, s.SerialNumber, s.ExpiryDate, s.CreatedAt, s.UpdatedAt))
+            .Select(s => new InventoryStockDto(s.Id, s.ItemId, s.Item.Name, s.LocationId, s.Location.Name, s.Quantity, s.ReservedQuantity, s.BatchNumber, s.SerialNumber, s.ExpiryDate, s.ProductionDate, s.BestBeforeDate, s.ReceiptDate, s.Status.ToString(), s.CreatedAt, s.UpdatedAt))
             .ToListAsync(ct);
 
     public async Task<InventoryStockDto> AddStockAsync(Guid tenantId, AddStockRequest request, Guid userId, CancellationToken ct = default)
@@ -1152,6 +1154,9 @@ public class InventoryService(AppDbContext db, AuditService audit, IServiceProvi
             existingStock.Quantity += request.Quantity;
             existingStock.UpdatedAt = DateTime.UtcNow;
             existingStock.ExpiryDate ??= request.ExpiryDate;
+            existingStock.ProductionDate ??= request.ProductionDate;
+            existingStock.BestBeforeDate ??= request.BestBeforeDate;
+            existingStock.Status = string.IsNullOrEmpty(request.Status) ? existingStock.Status : Enum.Parse<StockStatus>(request.Status, true);
             existingStock.Version++;
 
             await db.SaveChangesAsync(ct);
@@ -1160,7 +1165,7 @@ public class InventoryService(AppDbContext db, AuditService audit, IServiceProvi
 
         await BroadcastUpdateAsync(tenantId, new { type = "STOCK_UPDATED", itemId = existingStock.ItemId, sku = item.Sku }, ct);
 
-            return new InventoryStockDto(existingStock.Id, existingStock.ItemId, item.Name, existingStock.LocationId, location.Name, existingStock.Quantity, existingStock.ReservedQuantity, existingStock.BatchNumber, existingStock.SerialNumber, existingStock.ExpiryDate, existingStock.CreatedAt, existingStock.UpdatedAt);
+            return new InventoryStockDto(existingStock.Id, existingStock.ItemId, item.Name, existingStock.LocationId, location.Name, existingStock.Quantity, existingStock.ReservedQuantity, existingStock.BatchNumber, existingStock.SerialNumber, existingStock.ExpiryDate, existingStock.ProductionDate, existingStock.BestBeforeDate, existingStock.ReceiptDate, existingStock.Status.ToString(), existingStock.CreatedAt, existingStock.UpdatedAt);
         }
 
         var stock = new InventoryStock
@@ -1173,6 +1178,10 @@ public class InventoryService(AppDbContext db, AuditService audit, IServiceProvi
             BatchNumber = batchNumber,
             SerialNumber = serialNumber,
             ExpiryDate = request.ExpiryDate,
+            ProductionDate = request.ProductionDate,
+            BestBeforeDate = request.BestBeforeDate,
+            ReceiptDate = DateTime.UtcNow,
+            Status = string.IsNullOrEmpty(request.Status) ? StockStatus.Active : Enum.Parse<StockStatus>(request.Status, true),
             UpdatedAt = DateTime.UtcNow
         };
 
@@ -1183,7 +1192,7 @@ public class InventoryService(AppDbContext db, AuditService audit, IServiceProvi
 
         await BroadcastUpdateAsync(tenantId, new { type = "STOCK_ADDED", itemId = stock.ItemId, sku = item.Sku }, ct);
 
-        return new InventoryStockDto(stock.Id, stock.ItemId, item.Name, stock.LocationId, location.Name, stock.Quantity, stock.ReservedQuantity, stock.BatchNumber, stock.SerialNumber, stock.ExpiryDate, stock.CreatedAt, stock.UpdatedAt);
+        return new InventoryStockDto(stock.Id, stock.ItemId, item.Name, stock.LocationId, location.Name, stock.Quantity, stock.ReservedQuantity, stock.BatchNumber, stock.SerialNumber, stock.ExpiryDate, stock.ProductionDate, stock.BestBeforeDate, stock.ReceiptDate, stock.Status.ToString(), stock.CreatedAt, stock.UpdatedAt);
     }
 
     public async Task BroadcastUpdateAsync(Guid tenantId, object payload, CancellationToken ct = default)
@@ -1196,10 +1205,10 @@ public class InventoryService(AppDbContext db, AuditService audit, IServiceProvi
     }
 }
 
-public record AddStockRequest(Guid ItemId, Guid LocationId, decimal Quantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate);
+public record AddStockRequest(Guid ItemId, Guid LocationId, decimal Quantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate, DateTime? ProductionDate, DateTime? BestBeforeDate, string? Status);
 
 public record InventorySessionDto(Guid Id, string Name, string? Description, string Status, DateTime? StartedAt, DateTime? CompletedAt, Guid? StartedByUserId, string? StartedByUserName, DateTime CreatedAt);
-public record InventoryCountDto(Guid Id, Guid SessionId, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal SystemQuantity, decimal? CountedQuantity, string? BatchNumber, string? SerialNumber, Guid? CountedByUserId, string? CountedByUserName, DateTime? CountedAt, DateTime CreatedAt);
+public record InventoryCountDto(Guid Id, Guid SessionId, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal SystemQuantity, decimal? CountedQuantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate, DateTime? ProductionDate, DateTime? BestBeforeDate, Guid? CountedByUserId, string? CountedByUserName, DateTime? CountedAt, DateTime CreatedAt);
 
 public class InventorySessionService(AppDbContext db, AuditService audit, NotificationAlertService alerts, IHubContext<DynamicHubProxy> hubContext)
 {
@@ -1240,7 +1249,10 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
                 LocationId = stock.LocationId,
                 ExpectedQuantity = stock.Quantity,
                 BatchNumber = stock.BatchNumber,
-                SerialNumber = stock.SerialNumber
+                SerialNumber = stock.SerialNumber,
+                ExpiryDate = stock.ExpiryDate,
+                ProductionDate = stock.ProductionDate,
+                BestBeforeDate = stock.BestBeforeDate
             });
         }
 
@@ -1342,7 +1354,10 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
                 LocationId = stock.LocationId,
                 ExpectedQuantity = stock.Quantity,
                 BatchNumber = stock.BatchNumber,
-                SerialNumber = stock.SerialNumber
+                SerialNumber = stock.SerialNumber,
+                ExpiryDate = stock.ExpiryDate,
+                ProductionDate = stock.ProductionDate,
+                BestBeforeDate = stock.BestBeforeDate
             };
             db.InventoryCounts.Add(count);
         }
@@ -1393,6 +1408,9 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
                 c.CountedQuantity,
                 c.BatchNumber,
                 c.SerialNumber,
+                c.ExpiryDate,
+                c.ProductionDate,
+                c.BestBeforeDate,
                 c.CountedByUserId,
                 c.CountedByUser != null ? c.CountedByUser.FullName : null,
                 c.CountedAt,
@@ -1465,6 +1483,8 @@ public record PickingStockLineDto(
     string ItemName,
     string LocationName,
     decimal Quantity,
+    bool IsOverride,
+    string? OverrideReason,
     string? BatchNumber,
     string? SerialNumber,
     DateTime? ExpiryDate,
@@ -1489,7 +1509,8 @@ public record CreatePickingLineRequest(
 
 public record UpdatePickingLineRequest(
     Guid LineId,
-    decimal PickedQuantity);
+    decimal PickedQuantity,
+    string? OverrideReason);
 
 public class PickingService(AppDbContext db, AuditService audit, NotificationAlertService alerts, IHubContext<DynamicHubProxy> hubContext, ShippingService shippingService)
 {
@@ -1540,7 +1561,16 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
         if (request.Lines.Any(l => l.Quantity <= 0))
             throw new InvalidOperationException("Всички количества в picking поръчката трябва да са по-големи от 0");
 
-        var strategy = Enum.Parse<PickingStrategy>(request.Strategy, true);
+        PickingStrategy strategy;
+        if (string.IsNullOrEmpty(request.Strategy))
+        {
+            strategy = PickingStrategy.FIFO;
+        }
+        else
+        {
+            strategy = Enum.Parse<PickingStrategy>(request.Strategy, true);
+        }
+
         var order = new PickingOrder
         {
             TenantId = tenantId,
@@ -1614,18 +1644,24 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
         var availableStockQuery = db.InventoryStocks
             .Include(s => s.Item)
             .Include(s => s.Location)
-            .Where(s => s.TenantId == tenantId && s.ItemId == line.ItemId && s.Quantity > 0);
+            .Where(s => s.TenantId == tenantId && s.ItemId == line.ItemId && s.Quantity > 0 && s.Status == StockStatus.Active);
 
         if (line.SourceLocationId.HasValue)
             availableStockQuery = availableStockQuery.Where(s => s.LocationId == line.SourceLocationId.Value);
 
         var availableStock = strategy switch
         {
-            PickingStrategy.FIFO => await availableStockQuery.OrderBy(s => s.CreatedAt).ToListAsync(ct),
+            PickingStrategy.FIFO => await availableStockQuery.OrderBy(s => s.ReceiptDate ?? s.CreatedAt).ToListAsync(ct),
             PickingStrategy.FEFO => await availableStockQuery
                 .OrderBy(s => s.ExpiryDate.HasValue ? 0 : 1) // Items with expiry date first
                 .ThenBy(s => s.ExpiryDate ?? DateTime.MaxValue)
-                .ThenBy(s => s.CreatedAt)
+                .ThenBy(s => s.ReceiptDate ?? s.CreatedAt)
+                .ToListAsync(ct),
+            PickingStrategy.LIFO => await availableStockQuery.OrderByDescending(s => s.ReceiptDate ?? s.CreatedAt).ToListAsync(ct),
+            PickingStrategy.FPFO => await availableStockQuery
+                .OrderBy(s => s.ProductionDate.HasValue ? 0 : 1)
+                .ThenBy(s => s.ProductionDate ?? DateTime.MaxValue)
+                .ThenBy(s => s.ReceiptDate ?? s.CreatedAt)
                 .ToListAsync(ct),
             _ => throw new ArgumentOutOfRangeException()
         };
@@ -1716,10 +1752,11 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
         return await GetAsync(tenantId, order.Id, ct);
     }
 
-    public async Task<PickingOrderDto> UpdateStockLineAsync(Guid tenantId, Guid stockLineId, decimal pickedQuantity, Guid userId, CancellationToken ct = default)
+    public async Task<PickingOrderDto> UpdateStockLineAsync(Guid tenantId, Guid stockLineId, decimal pickedQuantity, Guid userId, string? overrideReason = null, CancellationToken ct = default)
     {
         var stockLine = await db.PickingStockLines
             .Include(s => s.PickingOrderLine).ThenInclude(l => l.PickingOrder).ThenInclude(o => o.Lines).ThenInclude(ol => ol.StockLines)
+            .Include(s => s.InventoryStock)
             .FirstOrDefaultAsync(s => s.Id == stockLineId && s.TenantId == tenantId, ct);
 
         if (stockLine is null) throw new KeyNotFoundException("Редът не е намерен");
@@ -1740,25 +1777,21 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
 
             if (order.Strategy == PickingStrategy.FEFO || order.Strategy == PickingStrategy.FIFO)
             {
-                // In a real scenario, we might want to check if there are other stock lines that should be picked first
-                // based on the same criteria used in GenerateStockLinesAsync.
-                // For now, we'll enforce that the operator follows the suggested sequence if it's a strict strategy.
-
-                // Simple enforcement: Check if there's any other stock line for the same ITEM that expires earlier and is not yet picked
-                var item = await db.Items.FindAsync([stockLine.PickingOrderLine.ItemId], ct);
-                var currentStock = await db.InventoryStocks.FindAsync([stockLine.InventoryStockId], ct);
-
                 var betterOptionsExist = unpickedPrecedingLines.Any(s =>
                     s.PickingOrderLine.ItemId == stockLine.PickingOrderLine.ItemId &&
                     s.Id != stockLineId);
 
-                if (betterOptionsExist)
+                if (betterOptionsExist && string.IsNullOrEmpty(overrideReason))
                 {
-                    throw new InvalidOperationException("Има други партиди за този артикул, които трябва да бъдат взети първи според стратегията (FEFO/FIFO).");
+                    throw new InvalidOperationException("Има други партиди за този артикул, които трябва да бъдат взети първи според стратегията (FEFO/FIFO). Моля, посочете причина за override.");
                 }
 
-                // Note: A more complex check would involve comparing ExpiryDates/CreatedDates again,
-                // but usually the fact that they are in 'unpickedPrecedingLines' means they were suggested first.
+                if (betterOptionsExist && !string.IsNullOrEmpty(overrideReason))
+                {
+                    stockLine.IsOverride = true;
+                    stockLine.OverrideReason = overrideReason;
+                    await audit.LogAsync(tenantId, "PICKING_OVERRIDE", userId, null, "PickingStockLine", stockLine.Id.ToString(), $"Reason: {overrideReason}", null, ct);
+                }
             }
 
             stockLine.PickedByUserId = userId;
@@ -1820,6 +1853,8 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
             line.InventoryStock?.Item?.Name ?? "",
             line.InventoryStock?.Location?.Name ?? "",
             line.Quantity,
+            line.IsOverride,
+            line.OverrideReason,
             line.InventoryStock?.BatchNumber,
             line.InventoryStock?.SerialNumber,
             line.InventoryStock?.ExpiryDate,
@@ -1856,6 +1891,8 @@ public record GoodsReceiptLineDto(
     string? BatchNumber,
     string? SerialNumber,
     DateTime? ExpiryDate,
+    DateTime? ProductionDate,
+    DateTime? BestBeforeDate,
     DateTime? ReceivedAt,
     string? Notes);
 
@@ -1873,6 +1910,8 @@ public record CreateGoodsReceiptLineRequest(
     string? BatchNumber,
     string? SerialNumber,
     DateTime? ExpiryDate,
+    DateTime? ProductionDate,
+    DateTime? BestBeforeDate,
     string? Notes);
 
 public record UpdateGoodsReceiptLineRequest(decimal ReceivedQuantity);
@@ -1941,6 +1980,8 @@ public class GoodsReceiptService(AppDbContext db, AuditService audit)
                 BatchNumber = lineReq.BatchNumber,
                 SerialNumber = lineReq.SerialNumber,
                 ExpiryDate = lineReq.ExpiryDate,
+                ProductionDate = lineReq.ProductionDate,
+                BestBeforeDate = lineReq.BestBeforeDate,
                 Notes = lineReq.Notes
             };
             db.GoodsReceiptLines.Add(line);
@@ -2001,6 +2042,9 @@ public class GoodsReceiptService(AppDbContext db, AuditService audit)
                 {
                     existingStock.Quantity += line.ReceivedQuantity.Value;
                     existingStock.UpdatedAt = DateTime.UtcNow;
+                    existingStock.ExpiryDate ??= line.ExpiryDate;
+                    existingStock.ProductionDate ??= line.ProductionDate;
+                    existingStock.BestBeforeDate ??= line.BestBeforeDate;
                 }
                 else
                 {
@@ -2014,6 +2058,10 @@ public class GoodsReceiptService(AppDbContext db, AuditService audit)
                         BatchNumber = line.BatchNumber,
                         SerialNumber = line.SerialNumber,
                         ExpiryDate = line.ExpiryDate,
+                        ProductionDate = line.ProductionDate,
+                        BestBeforeDate = line.BestBeforeDate,
+                        ReceiptDate = DateTime.UtcNow,
+                        Status = StockStatus.Active,
                         UpdatedAt = DateTime.UtcNow
                     };
                     db.InventoryStocks.Add(stock);
@@ -2086,6 +2134,8 @@ public class GoodsReceiptService(AppDbContext db, AuditService audit)
             line.BatchNumber,
             line.SerialNumber,
             line.ExpiryDate,
+            line.ProductionDate,
+            line.BestBeforeDate,
             line.ReceivedAt,
             line.Notes
         );

@@ -38,7 +38,7 @@ public class BusinessLogicTests
         db.Locations.Add(location);
         await db.SaveChangesAsync();
 
-        var request = new AddStockRequest(item.Id, location.Id, 10, null, null, null);
+        var request = new AddStockRequest(item.Id, location.Id, 10, null, null, null, null, null, null);
 
         // Act
         await service.AddStockAsync(tenantId, request, Guid.NewGuid());
@@ -315,7 +315,8 @@ public class BusinessLogicTests
         await service.CreateExpiryAlertsAsync(tenantId, Guid.NewGuid());
 
         var alerts = await db.NotificationAlerts.Where(a => a.TenantId == tenantId).ToListAsync();
-        Assert.Single(alerts);
+        // Now returns 3 alerts because it hits 90, 30, and 7 day thresholds
+        Assert.Equal(3, alerts.Count);
     }
 
     [Fact]
@@ -373,7 +374,7 @@ public class BusinessLogicTests
         db.Locations.Add(location);
         await db.SaveChangesAsync();
 
-        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, location.Id, 2, null, null, null));
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, location.Id, 2, null, null, null, null, null, null));
         var operations = new List<SyncOperationItem>
         {
             new SyncOperationItem("op-idem", "STOCK_ADD", payload, DateTime.UtcNow, 1)
@@ -407,7 +408,7 @@ public class BusinessLogicTests
         db.Locations.Add(location);
         await db.SaveChangesAsync();
 
-        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, location.Id, 5, "B1", null, null));
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, location.Id, 5, "B1", null, null, null, null, null));
         var operations = new List<SyncOperationItem>
         {
             new SyncOperationItem("op-1", "STOCK_ADD", payload, DateTime.UtcNow, 1)
@@ -496,7 +497,7 @@ public class BusinessLogicTests
 
         // Operation from client at T-5 (newer than T-10)
         var newerTimestamp = DateTime.UtcNow.AddMinutes(-5);
-        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, loc.Id, 5, null, null, null));
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, loc.Id, 5, null, null, null, null, null, null));
         var op = new SyncOperationItem("sync-op-1", "STOCK_ADD", payload, newerTimestamp, 2);
 
         // Act
@@ -535,7 +536,7 @@ public class BusinessLogicTests
 
         // Operation from client at T-10 (older than T0)
         var olderTimestamp = DateTime.UtcNow.AddMinutes(-10);
-        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, loc.Id, 5, null, null, null));
+        var payload = System.Text.Json.JsonSerializer.Serialize(new AddStockRequest(item.Id, loc.Id, 5, null, null, null, null, null, null));
         var op = new SyncOperationItem("sync-op-old", "STOCK_ADD", payload, olderTimestamp, 4);
 
         // Act

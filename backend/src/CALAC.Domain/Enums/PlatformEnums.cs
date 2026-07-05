@@ -58,3 +58,11 @@ public enum EcommerceOrderStatus
     Shipped = 3,
     Cancelled = 4
 }
+
+public enum StockStatus
+{
+    Active = 0,
+    Quarantined = 1,
+    Blocked = 2,
+    Expired = 3
+}

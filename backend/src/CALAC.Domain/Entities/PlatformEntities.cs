@@ -134,6 +134,7 @@ public class Item : ITenantEntity
     public string? ImageUrl { get; set; }
     public decimal? Weight { get; set; }
     public string? UnitOfMeasure { get; set; }
+    public PickingStrategy DefaultPickingStrategy { get; set; } = PickingStrategy.FIFO;
     public bool IsActive { get; set; } = true;
     public int Version { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -332,6 +333,10 @@ public class InventoryStock : ITenantEntity
     public string? BatchNumber { get; set; }
     public string? SerialNumber { get; set; }
     public DateTime? ExpiryDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
+    public DateTime? BestBeforeDate { get; set; }
+    public DateTime? ReceiptDate { get; set; }
+    public StockStatus Status { get; set; } = StockStatus.Active;
     public int Version { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
@@ -383,6 +388,8 @@ public class InventoryCount : ITenantEntity
     public string? BatchNumber { get; set; }
     public string? SerialNumber { get; set; }
     public DateTime? ExpiryDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
+    public DateTime? BestBeforeDate { get; set; }
     public Guid? CountedByUserId { get; set; }
     public DateTime? CountedAt { get; set; }
     public string? Notes { get; set; }
@@ -398,7 +405,9 @@ public class InventoryCount : ITenantEntity
 public enum PickingStrategy
 {
     FIFO = 0, // First In, First Out
-    FEFO = 1  // First Expired, First Out
+    FEFO = 1, // First Expired, First Out
+    LIFO = 2, // Last In, First Out
+    FPFO = 3  // First Produced, First Out
 }
 
 public enum PickingOrderStatus
@@ -459,6 +468,8 @@ public class PickingStockLine : ITenantEntity
     public Guid PickingOrderLineId { get; set; }
     public Guid InventoryStockId { get; set; }
     public decimal Quantity { get; set; }
+    public bool IsOverride { get; set; }
+    public string? OverrideReason { get; set; }
     public Guid? PickedByUserId { get; set; }
     public DateTime? PickedAt { get; set; }
     public int Version { get; set; } = 1;
@@ -512,6 +523,8 @@ public class GoodsReceiptLine : ITenantEntity
     public string? BatchNumber { get; set; }
     public string? SerialNumber { get; set; }
     public DateTime? ExpiryDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
+    public DateTime? BestBeforeDate { get; set; }
     public DateTime? ReceivedAt { get; set; }
     public string? Notes { get; set; }
 
