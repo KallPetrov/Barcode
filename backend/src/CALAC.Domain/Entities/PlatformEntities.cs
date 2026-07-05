@@ -135,6 +135,7 @@ public class Item : ITenantEntity
     public decimal? Weight { get; set; }
     public string? UnitOfMeasure { get; set; }
     public PickingStrategy DefaultPickingStrategy { get; set; } = PickingStrategy.FIFO;
+    public int? MinShelfLifeDays { get; set; }
     public bool IsActive { get; set; } = true;
     public int Version { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

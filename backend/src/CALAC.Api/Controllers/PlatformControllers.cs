@@ -241,7 +241,7 @@ public class ErpWebhooksController(ItemService items, InventoryService inventory
             var existing = await items.GetByBarcodeAsync(payload.TenantId, payload.Barcode ?? payload.Sku, ct);
             if (existing == null)
             {
-                await items.CreateAsync(payload.TenantId, new CreateItemRequest(payload.Sku, payload.Name ?? payload.Sku, null, payload.Barcode, null, null, null, null, null), Guid.Empty, ct);
+                await items.CreateAsync(payload.TenantId, new CreateItemRequest(payload.Sku, payload.Name ?? payload.Sku, null, payload.Barcode, null, null, null, null, null, null), Guid.Empty, ct);
             }
         }
         else if (payload.Type == "STOCK_UPDATE" && payload.Quantity.HasValue && !string.IsNullOrEmpty(payload.LocationCode))
