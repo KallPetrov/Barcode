@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { AdminRoute, ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import { SignalRProvider } from './context/SignalRContext';
 import { DashboardPage } from './pages/DashboardPage';
 import { DevicesPage } from './pages/DevicesPage';
 import { LoginPage } from './pages/LoginPage';
@@ -27,7 +28,8 @@ import './App.css';
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <SignalRProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
@@ -58,6 +60,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </SignalRProvider>
     </AuthProvider>
   );
 }

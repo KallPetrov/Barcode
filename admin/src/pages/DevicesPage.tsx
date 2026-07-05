@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDevices, type Device } from '../api/client';
+import { getDevices, revokeDevice, type Device } from '../api/client';
 
 const statusLabel: Record<Device['status'], string> = {
   Online: 'Онлайн',
@@ -11,11 +11,26 @@ export function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchDevices = () => {
+    setLoading(true);
     getDevices()
       .then(setDevices)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDevices();
   }, []);
+
+  const handleRevoke = async (id: string) => {
+    if (!confirm('Сигурни ли сте, че искате да прекратите достъпа на това устройство?')) return;
+    try {
+      await revokeDevice(id);
+      fetchDevices();
+    } catch (err) {
+      alert('Грешка при деактивиране на устройството');
+    }
+  };
 
   return (
     <div>
@@ -39,6 +54,7 @@ export function DevicesPage() {
               <th>Батерия</th>
               <th>Оператор</th>
               <th>Последна активност</th>
+              <th>Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -52,6 +68,11 @@ export function DevicesPage() {
                 <td>{d.batteryLevel != null ? `${d.batteryLevel}%` : '—'}</td>
                 <td>{d.assignedUserName ?? '—'}</td>
                 <td>{d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString('bg-BG') : '—'}</td>
+                <td>
+                  {d.status !== 'Maintenance' && (
+                    <button className="small danger" onClick={() => handleRevoke(d.id)}>Деактивирай</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

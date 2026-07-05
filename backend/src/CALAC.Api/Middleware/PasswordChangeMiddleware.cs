@@ -13,7 +13,7 @@ public class PasswordChangeMiddleware(RequestDelegate next)
             {
                 var path = context.Request.Path.Value?.ToLower();
                 // Allow only auth-related endpoints and logout
-                var allowedPaths = new[] { "/api/auth/change-password", "/api/auth/logout", "/api/auth/user" };
+                var allowedPaths = new[] { "/api/auth/change-password", "/api/auth/logout", "/api/auth/me" };
 
                 if (allowedPaths.All(p => path != null && !path.StartsWith(p)))
                 {

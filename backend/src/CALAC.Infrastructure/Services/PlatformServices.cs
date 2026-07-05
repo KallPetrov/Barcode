@@ -631,6 +631,22 @@ public class DeviceService(AppDbContext db, AuditService audit)
         return device is null ? null : ToDto(device);
     }
 
+    public async Task<bool> RevokeAsync(Guid tenantId, Guid id, Guid userId, CancellationToken ct = default)
+    {
+        var device = await db.Devices.FirstOrDefaultAsync(d => d.Id == id && d.TenantId == tenantId, ct);
+        if (device is null) return false;
+
+        device.Status = DeviceStatus.Offline;
+        device.AssignedUserId = null;
+        // In a real scenario, we might want to flag it as 'Blacklisted' or 'Inactive'
+        // For now, let's just set status to Maintenance or similar, but let's use status to block sync.
+        device.Status = DeviceStatus.Maintenance;
+
+        await db.SaveChangesAsync(ct);
+        await audit.LogAsync(tenantId, "DEVICE_REVOKED", userId, device.Id, "Device", device.Id.ToString(), null, null, ct);
+        return true;
+    }
+
     private static DeviceDto ToDto(Device d) =>
         new(d.Id, d.HardwareId, d.Name, d.Manufacturer, d.Model, d.AppVersion, d.Status,
             d.BatteryLevel, d.AssignedUser?.FullName, d.RegisteredAt, d.LastSeenAt);
@@ -821,8 +837,18 @@ public class SyncService(
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (pickingLineReq != null)
                 {
+                    var lineId = Guid.Parse(syncOp.ClientOperationId);
+                    var existingLine = await db.PickingStockLines.IgnoreQueryFilters().FirstOrDefaultAsync(l => l.Id == lineId && l.TenantId == tenantId, ct);
+                    if (existingLine != null && syncOp.Version > 0 && syncOp.Version <= existingLine.Version)
+                    {
+                        if (syncOp.ClientTimestamp.HasValue && existingLine.UpdatedAt.HasValue && syncOp.ClientTimestamp.Value < existingLine.UpdatedAt.Value)
+                        {
+                            return;
+                        }
+                    }
+
                     var pickingService = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<PickingService>(serviceProvider);
-                    await pickingService.UpdateStockLineAsync(tenantId, Guid.Parse(syncOp.ClientOperationId), pickingLineReq.PickedQuantity, userId ?? Guid.Empty, ct);
+                    await pickingService.UpdateStockLineAsync(tenantId, lineId, pickingLineReq.PickedQuantity, userId ?? Guid.Empty, ct);
                 }
                 break;
             default:
@@ -1085,7 +1111,7 @@ public record UpdateItemRequest(string Sku, string Name, string? Description, st
 
 public record InventoryStockDto(Guid Id, Guid ItemId, string ItemName, Guid LocationId, string LocationName, decimal Quantity, decimal? ReservedQuantity, string? BatchNumber, string? SerialNumber, DateTime? ExpiryDate, DateTime CreatedAt, DateTime? UpdatedAt);
 
-public class InventoryService(AppDbContext db, AuditService audit)
+public class InventoryService(AppDbContext db, AuditService audit, IServiceProvider serviceProvider)
 {
     public async Task<IReadOnlyList<InventoryStockDto>> ListStockAsync(Guid tenantId, CancellationToken ct = default) =>
         await db.InventoryStocks
@@ -1132,6 +1158,8 @@ public class InventoryService(AppDbContext db, AuditService audit)
             await audit.LogAsync(tenantId, "STOCK_UPDATED", userId, null, "InventoryStock", existingStock.Id.ToString(),
                 $"ItemId={existingStock.ItemId}, LocationId={existingStock.LocationId}, Quantity={existingStock.Quantity}", null, ct);
 
+        await BroadcastUpdateAsync(tenantId, new { type = "STOCK_UPDATED", itemId = existingStock.ItemId, sku = item.Sku }, ct);
+
             return new InventoryStockDto(existingStock.Id, existingStock.ItemId, item.Name, existingStock.LocationId, location.Name, existingStock.Quantity, existingStock.ReservedQuantity, existingStock.BatchNumber, existingStock.SerialNumber, existingStock.ExpiryDate, existingStock.CreatedAt, existingStock.UpdatedAt);
         }
 
@@ -1153,7 +1181,18 @@ public class InventoryService(AppDbContext db, AuditService audit)
         await audit.LogAsync(tenantId, "STOCK_ADDED", userId, null, "InventoryStock", stock.Id.ToString(),
             $"ItemId={stock.ItemId}, LocationId={stock.LocationId}, Quantity={stock.Quantity}", null, ct);
 
+        await BroadcastUpdateAsync(tenantId, new { type = "STOCK_ADDED", itemId = stock.ItemId, sku = item.Sku }, ct);
+
         return new InventoryStockDto(stock.Id, stock.ItemId, item.Name, stock.LocationId, location.Name, stock.Quantity, stock.ReservedQuantity, stock.BatchNumber, stock.SerialNumber, stock.ExpiryDate, stock.CreatedAt, stock.UpdatedAt);
+    }
+
+    public async Task BroadcastUpdateAsync(Guid tenantId, object payload, CancellationToken ct = default)
+    {
+        var hubContext = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetService<IHubContext<CALAC.Infrastructure.Hubs.WarehouseHub>>(serviceProvider);
+        if (hubContext?.Clients != null)
+        {
+            await hubContext.Clients.Group(tenantId.ToString()).SendAsync("WarehouseEvent", payload, ct);
+        }
     }
 }
 
@@ -1689,6 +1728,9 @@ public class PickingService(AppDbContext db, AuditService audit, NotificationAle
 
         if (pickedQuantity > 0)
         {
+            stockLine.Version++;
+            stockLine.UpdatedAt = DateTime.UtcNow;
+
             // Strict FEFO/FIFO check
             var order = stockLine.PickingOrderLine.PickingOrder;
             var unpickedPrecedingLines = order.Lines
@@ -2349,9 +2391,16 @@ public record UpdateErpConfigRequest(
     bool AutoSyncInventory,
     string? SettingsJson);
 
-public class ErpConfigurationService(AppDbContext db, AuditService audit, IDataProtectionProvider dataProtection)
+public class ErpConfigurationService(AppDbContext db, AuditService audit, IDataProtectionProvider dataProtection, IEnumerable<CALAC.Infrastructure.Services.ErpIntegration.IErpAdapter> erpAdapters)
 {
     private readonly IDataProtector _protector = dataProtection.CreateProtector("ERP_Secrets");
+
+    private CALAC.Infrastructure.Services.ErpIntegration.IErpAdapter GetAdapter(ErpProviderType type)
+    {
+        var providerName = type.ToString();
+        return erpAdapters.FirstOrDefault(a => a.ProviderName == providerName)
+            ?? throw new NotSupportedException($"ERP provider {providerName} is not supported or not registered.");
+    }
 
     public async Task<IReadOnlyList<ErpConfigurationDto>> ListAsync(Guid tenantId, CancellationToken ct = default)
     {
@@ -2477,8 +2526,8 @@ public class ErpConfigurationService(AppDbContext db, AuditService audit, IDataP
         if (config is null)
             throw new KeyNotFoundException("ERP конфигурацията не е намерена");
 
-        await Task.Delay(100, ct);
-        return !string.IsNullOrEmpty(config.ApiUrl);
+        var adapter = GetAdapter(config.ProviderType);
+        return await adapter.TestConnectionAsync(ct);
     }
 
     public async Task SyncItemsAsync(Guid tenantId, Guid id, Guid userId, CancellationToken ct = default)
@@ -2489,7 +2538,8 @@ public class ErpConfigurationService(AppDbContext db, AuditService audit, IDataP
         if (config is null)
             throw new KeyNotFoundException("ERP конфигурацията не е намерена");
 
-        await Task.Delay(100, ct);
+        var adapter = GetAdapter(config.ProviderType);
+        await adapter.SyncItemsAsync(ct);
         
         config.LastSyncAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -2505,7 +2555,8 @@ public class ErpConfigurationService(AppDbContext db, AuditService audit, IDataP
         if (config is null)
             throw new KeyNotFoundException("ERP конфигурацията не е намерена");
 
-        await Task.Delay(100, ct);
+        var adapter = GetAdapter(config.ProviderType);
+        await adapter.SyncInventoryAsync(ct);
         
         config.LastSyncAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);

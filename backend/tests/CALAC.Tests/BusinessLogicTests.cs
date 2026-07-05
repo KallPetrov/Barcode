@@ -29,7 +29,8 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
-        var service = new InventoryService(db, audit.Object);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var service = new InventoryService(db, audit.Object, sp);
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "TEST-1", Name = "Test Item" };
         var location = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "LOC-1", Name = "Loc 1" };
@@ -54,7 +55,8 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new AuditService(db);
-        var alerts = new NotificationAlertService(db, audit);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var alerts = new NotificationAlertService(db, audit, sp);
         var hub = new Mock<IHubContext<DynamicHubProxy>>();
         var clients = new Mock<IHubClients>();
         var group = new Mock<IClientProxy>();
@@ -89,7 +91,8 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
-        var alerts = new Mock<NotificationAlertService>(db, audit.Object);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var alerts = new Mock<NotificationAlertService>(db, audit.Object, sp);
         var hub = new Mock<IHubContext<DynamicHubProxy>>();
         var shippingLogger = new Mock<ILogger<ShippingService>>();
         var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
@@ -298,7 +301,8 @@ public class BusinessLogicTests
     {
         using var db = CreateDbContext();
         var audit = new AuditService(db);
-        var service = new NotificationAlertService(db, audit);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var service = new NotificationAlertService(db, audit, sp);
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "EXP-1", Name = "Expiring Item" };
         var location = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "E1", Name = "E1" };
@@ -356,8 +360,9 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new AuditService(db);
-        var inventory = new InventoryService(db, audit);
-        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var inventory = new InventoryService(db, audit, sp);
+        var serviceProvider = sp;
         var service = new SyncService(db, audit, inventory, serviceProvider);
 
         var tenantId = Guid.NewGuid();
@@ -391,8 +396,9 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
-        var inventory = new InventoryService(db, audit.Object);
-        var service = new SyncService(db, audit.Object, inventory, new ServiceCollection().BuildServiceProvider());
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var inventory = new InventoryService(db, audit.Object, sp);
+        var service = new SyncService(db, audit.Object, inventory, sp);
 
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-S", Name = "Sync Item", IsActive = true };
@@ -429,7 +435,8 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
-        var alerts = new Mock<NotificationAlertService>(db, audit.Object);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var alerts = new Mock<NotificationAlertService>(db, audit.Object, sp);
         var hub = new Mock<IHubContext<DynamicHubProxy>>();
         var shippingLogger = new Mock<ILogger<ShippingService>>();
         var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
@@ -468,8 +475,9 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
-        var inventory = new InventoryService(db, audit.Object);
-        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var inventory = new InventoryService(db, audit.Object, sp);
+        var serviceProvider = sp;
         var service = new SyncService(db, audit.Object, inventory, serviceProvider);
 
         var tenantId = Guid.NewGuid();
@@ -505,8 +513,9 @@ public class BusinessLogicTests
         // Arrange
         using var db = CreateDbContext();
         var audit = new Mock<AuditService>(db);
-        var inventory = new InventoryService(db, audit.Object);
-        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var inventory = new InventoryService(db, audit.Object, sp);
+        var serviceProvider = sp;
         var service = new SyncService(db, audit.Object, inventory, serviceProvider);
 
         var tenantId = Guid.NewGuid();

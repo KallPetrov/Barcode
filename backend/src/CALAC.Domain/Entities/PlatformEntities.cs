@@ -461,6 +461,9 @@ public class PickingStockLine : ITenantEntity
     public decimal Quantity { get; set; }
     public Guid? PickedByUserId { get; set; }
     public DateTime? PickedAt { get; set; }
+    public int Version { get; set; } = 1;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public Tenant Tenant { get; set; } = null!;
     public PickingOrderLine PickingOrderLine { get; set; } = null!;
