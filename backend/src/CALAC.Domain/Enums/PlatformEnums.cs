@@ -66,3 +66,26 @@ public enum StockStatus
     Blocked = 2,
     Expired = 3
 }
+
+public enum BarcodeSymbology
+{
+    Unknown = 0,
+    Upc = 1,
+    Ean = 2,
+    Code39 = 3,
+    Code128 = 4,
+    Itf = 5,
+    Code93 = 6,
+    Codabar = 7,
+    Gs1DataBar = 8,
+    MsiPlessey = 9,
+    Codablock = 10,
+    QrCode = 11,
+    DataMatrix = 12,
+    Pdf417 = 13,
+    Aztec = 14,
+    MaxiCode = 15,
+    HanXin = 16,
+    DotCode = 17,
+    Gs1128 = 18
+}
