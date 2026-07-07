@@ -12,8 +12,8 @@ android {
         applicationId = "com.barcodeplatform.pda"
         minSdk = 23
         targetSdk = 35
-        versionCode = 37
-        versionName = "0.37.0"
+        versionCode = 38
+        versionName = "0.38.0"
     }
 
     flavorDimensions += "environment"
