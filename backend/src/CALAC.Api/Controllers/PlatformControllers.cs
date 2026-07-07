@@ -241,7 +241,7 @@ public class ErpWebhooksController(ItemService items, InventoryService inventory
             var existing = await items.GetByBarcodeAsync(payload.TenantId, payload.Barcode ?? payload.Sku, ct);
             if (existing == null)
             {
-                await items.CreateAsync(payload.TenantId, new CreateItemRequest(payload.Sku, payload.Name ?? payload.Sku, null, payload.Barcode, null, null, null, null, null, null), Guid.Empty, ct);
+                await items.CreateAsync(payload.TenantId, new CreateItemRequest(payload.Sku, payload.Name ?? payload.Sku, null, payload.Barcode, null, null, null, null, "FIFO", null), Guid.Empty, ct);
             }
         }
         else if (payload.Type == "STOCK_UPDATE" && payload.Quantity.HasValue && !string.IsNullOrEmpty(payload.LocationCode))
@@ -680,10 +680,6 @@ public class InventoryController(InventoryService inventoryService) : Controller
     [HttpGet("stock")]
     public async Task<ActionResult<IReadOnlyList<InventoryStockDto>>> ListStock(CancellationToken ct) =>
         Ok(await inventoryService.ListStockAsync(TenantId, ct));
-
-    [HttpGet("identify/{barcode}")]
-    public async Task<ActionResult<CALAC.Infrastructure.Services.Barcode.BarcodeData>> Identify(string barcode) =>
-        Ok(await inventoryService.IdentifyBarcodeAsync(barcode));
 
     [HttpPost("stock")]
     [Authorize(Roles = "Admin,Supervisor")]
@@ -1378,7 +1374,7 @@ public class PickingController(PickingService pickingService) : ControllerBase
     {
         try
         {
-            return Ok(await pickingService.UpdateStockLineAsync(TenantId, id, request.PickedQuantity, UserId, request.OverrideReason, ct));
+            return Ok(await pickingService.UpdateStockLineAsync(TenantId, id, request.PickedQuantity, UserId, request.OverrideReason, request.TemperatureCelsius, ct));
         }
         catch (KeyNotFoundException)
         {

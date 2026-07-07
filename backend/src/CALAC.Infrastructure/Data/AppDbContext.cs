@@ -21,6 +21,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
     public DbSet<BomLine> BomLines => Set<BomLine>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<WorkOrderConsumption> WorkOrderConsumptions => Set<WorkOrderConsumption>();
+    public DbSet<ReturnOrder> ReturnOrders => Set<ReturnOrder>();
+    public DbSet<ReturnOrderLine> ReturnOrderLines => Set<ReturnOrderLine>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
     public DbSet<TenantBranding> TenantBrandings => Set<TenantBranding>();
     public DbSet<WaveBatch> WaveBatches => Set<WaveBatch>();

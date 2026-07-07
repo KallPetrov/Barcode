@@ -3,6 +3,7 @@ using System;
 using CALAC.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CALAC.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260705162039_AddMinShelfLifePercentageToPickingOrder")]
+    partial class AddMinShelfLifePercentageToPickingOrder
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -64,6 +67,125 @@ namespace CALAC.Infrastructure.Migrations
                     b.HasIndex("TenantId", "UserId");
 
                     b.ToTable("AuditLogs");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.BillOfMaterial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("FinishedItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("FinishedQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinishedItemId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("BillOfMaterials");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.BomLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BillOfMaterialId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ComponentItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillOfMaterialId");
+
+                    b.HasIndex("ComponentItemId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("BomLines");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.CourierConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApiKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApiUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ClientNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CourierType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Password")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SettingsJson")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "CourierType");
+
+                    b.ToTable("CourierConfigurations");
                 });
 
             modelBuilder.Entity("CALAC.Domain.Entities.Device", b =>
@@ -122,6 +244,144 @@ namespace CALAC.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Devices");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.EcommerceOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomerEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomerPhone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EcommerceStoreId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalOrderId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OrderCreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PickingOrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RawJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShippingAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShippingCity")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EcommerceStoreId");
+
+                    b.HasIndex("PickingOrderId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TenantId", "ExternalOrderId")
+                        .IsUnique();
+
+                    b.ToTable("EcommerceOrders");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.EcommerceStore", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("AutoImportOrders")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AutoSyncStock")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ConsumerKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConsumerSecret")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PlatformType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StoreUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WebhookSecret")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PlatformType");
+
+                    b.ToTable("EcommerceStores");
                 });
 
             modelBuilder.Entity("CALAC.Domain.Entities.ErpConfiguration", b =>
@@ -259,6 +519,9 @@ namespace CALAC.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("BestBeforeDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("ExpectedQuantity")
                         .HasPrecision(18, 4)
                         .HasColumnType("TEXT");
@@ -276,6 +539,9 @@ namespace CALAC.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ProductionDate")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ReceivedAt")
@@ -315,6 +581,9 @@ namespace CALAC.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("BestBeforeDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("CountedAt")
                         .HasColumnType("TEXT");
 
@@ -344,7 +613,13 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<Guid>("LocationId")
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal?>("MinRemainingShelfLifePercentage")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ProductionDate")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SerialNumber")
@@ -385,6 +660,9 @@ namespace CALAC.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("MinRemainingShelfLifePercentage")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -428,6 +706,9 @@ namespace CALAC.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("BestBeforeDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -440,8 +721,14 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<Guid>("LocationId")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("ProductionDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReceiptDate")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal?>("ReservedQuantity")
@@ -451,6 +738,9 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<string>("SerialNumber")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT");
@@ -493,6 +783,9 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("DefaultPickingStrategy")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
@@ -500,6 +793,9 @@ namespace CALAC.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MinShelfLifeDays")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -518,6 +814,12 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<string>("UnitOfMeasure")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("Weight")
                         .HasColumnType("TEXT");
@@ -555,6 +857,9 @@ namespace CALAC.Infrastructure.Migrations
 
                     b.Property<string>("Level")
                         .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("MinRemainingShelfLifePercentage")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -670,6 +975,48 @@ namespace CALAC.Infrastructure.Migrations
                     b.ToTable("OperatorPerformanceSnapshots");
                 });
 
+            modelBuilder.Entity("CALAC.Domain.Entities.PartnerApiKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "IsActive");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("PartnerApiKeys");
+                });
+
             modelBuilder.Entity("CALAC.Domain.Entities.PickingOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -686,6 +1033,9 @@ namespace CALAC.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("MinRemainingShelfLifePercentage")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -781,7 +1131,16 @@ namespace CALAC.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("InventoryStockId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsOverride")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OverrideReason")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("PickedAt")
@@ -799,6 +1158,12 @@ namespace CALAC.Infrastructure.Migrations
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -898,6 +1263,113 @@ namespace CALAC.Infrastructure.Migrations
                     b.ToTable("Reminders");
                 });
 
+            modelBuilder.Entity("CALAC.Domain.Entities.Shipment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("CodAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CourierConfigurationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCashOnDelivery")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LabelPdfUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LabelZpl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PackageCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("PickingOrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceiverAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceiverCity")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceiverEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceiverName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceiverPhone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceiverPostCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ShippedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalWeight")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TrackingUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WaybillNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourierConfigurationId");
+
+                    b.HasIndex("PickingOrderId");
+
+                    b.HasIndex("WaybillNumber");
+
+                    b.HasIndex("TenantId", "Status");
+
+                    b.ToTable("Shipments");
+                });
+
             modelBuilder.Entity("CALAC.Domain.Entities.SyncOperation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -919,6 +1391,10 @@ namespace CALAC.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("OperationType")
@@ -947,6 +1423,9 @@ namespace CALAC.Infrastructure.Migrations
                     b.HasIndex("Status");
 
                     b.HasIndex("DeviceId", "ClientOperationId")
+                        .IsUnique();
+
+                    b.HasIndex("DeviceId", "IdempotencyKey")
                         .IsUnique();
 
                     b.ToTable("SyncOperations");
@@ -980,6 +1459,95 @@ namespace CALAC.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Tenants");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.TenantBranding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FaviconUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrimaryColor")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SecondaryColor")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("WelcomeMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantBrandings");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.TenantSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PlanCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StripeCustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PlanCode");
+
+                    b.ToTable("TenantSubscriptions");
                 });
 
             modelBuilder.Entity("CALAC.Domain.Entities.TransferOrder", b =>
@@ -1038,6 +1606,9 @@ namespace CALAC.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("ItemId")
                         .HasColumnType("TEXT");
 
@@ -1066,6 +1637,12 @@ namespace CALAC.Infrastructure.Migrations
 
                     b.Property<Guid>("TransferOrderId")
                         .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1108,6 +1685,9 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1121,10 +1701,16 @@ namespace CALAC.Infrastructure.Migrations
                     b.Property<Guid>("TenantId")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1132,6 +1718,171 @@ namespace CALAC.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WaveBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrdersJson")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Name");
+
+                    b.ToTable("WaveBatches");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WebhookSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastSuccessAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Secret")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "EventType");
+
+                    b.HasIndex("TenantId", "IsActive");
+
+                    b.ToTable("WebhookSubscriptions");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WorkOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BillOfMaterialId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("PlannedQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ProducedQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillOfMaterialId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("WorkOrders");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WorkOrderConsumption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ComponentItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ConsumedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("InventoryStockId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ProducedInventoryStockId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InventoryStockId");
+
+                    b.HasIndex("ProducedInventoryStockId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.ToTable("WorkOrderConsumptions");
                 });
 
             modelBuilder.Entity("CALAC.Domain.Entities.WorkTask", b =>
@@ -1205,6 +1956,63 @@ namespace CALAC.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("CALAC.Domain.Entities.BillOfMaterial", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Item", "FinishedItem")
+                        .WithMany()
+                        .HasForeignKey("FinishedItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FinishedItem");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.BomLine", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.BillOfMaterial", "BillOfMaterial")
+                        .WithMany("Lines")
+                        .HasForeignKey("BillOfMaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.Item", "ComponentItem")
+                        .WithMany()
+                        .HasForeignKey("ComponentItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BillOfMaterial");
+
+                    b.Navigation("ComponentItem");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.CourierConfiguration", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("CALAC.Domain.Entities.Device", b =>
                 {
                     b.HasOne("CALAC.Domain.Entities.User", "AssignedUser")
@@ -1218,6 +2026,42 @@ namespace CALAC.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("AssignedUser");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.EcommerceOrder", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.EcommerceStore", "EcommerceStore")
+                        .WithMany("Orders")
+                        .HasForeignKey("EcommerceStoreId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.PickingOrder", "PickingOrder")
+                        .WithMany()
+                        .HasForeignKey("PickingOrderId");
+
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("EcommerceStore");
+
+                    b.Navigation("PickingOrder");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.EcommerceStore", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Tenant");
                 });
@@ -1438,6 +2282,17 @@ namespace CALAC.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("CALAC.Domain.Entities.PartnerApiKey", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("CALAC.Domain.Entities.PickingOrder", b =>
                 {
                     b.HasOne("CALAC.Domain.Entities.User", "AssignedUser")
@@ -1567,6 +2422,31 @@ namespace CALAC.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("CALAC.Domain.Entities.Shipment", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.CourierConfiguration", "CourierConfiguration")
+                        .WithMany()
+                        .HasForeignKey("CourierConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.PickingOrder", "PickingOrder")
+                        .WithMany()
+                        .HasForeignKey("PickingOrderId");
+
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CourierConfiguration");
+
+                    b.Navigation("PickingOrder");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("CALAC.Domain.Entities.SyncOperation", b =>
                 {
                     b.HasOne("CALAC.Domain.Entities.Device", "Device")
@@ -1576,6 +2456,28 @@ namespace CALAC.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Device");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.TenantBranding", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.TenantSubscription", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("CALAC.Domain.Entities.TransferOrder", b =>
@@ -1655,6 +2557,80 @@ namespace CALAC.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("CALAC.Domain.Entities.WaveBatch", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WebhookSubscription", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WorkOrder", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.BillOfMaterial", "BillOfMaterial")
+                        .WithMany()
+                        .HasForeignKey("BillOfMaterialId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BillOfMaterial");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WorkOrderConsumption", b =>
+                {
+                    b.HasOne("CALAC.Domain.Entities.InventoryStock", "InventoryStock")
+                        .WithMany()
+                        .HasForeignKey("InventoryStockId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.InventoryStock", "ProducedInventoryStock")
+                        .WithMany()
+                        .HasForeignKey("ProducedInventoryStockId");
+
+                    b.HasOne("CALAC.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CALAC.Domain.Entities.WorkOrder", "WorkOrder")
+                        .WithMany("Consumptions")
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InventoryStock");
+
+                    b.Navigation("ProducedInventoryStock");
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("WorkOrder");
+                });
+
             modelBuilder.Entity("CALAC.Domain.Entities.WorkTask", b =>
                 {
                     b.HasOne("CALAC.Domain.Entities.User", "AssignedUser")
@@ -1672,11 +2648,21 @@ namespace CALAC.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("CALAC.Domain.Entities.BillOfMaterial", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
             modelBuilder.Entity("CALAC.Domain.Entities.Device", b =>
                 {
                     b.Navigation("AuditLogs");
 
                     b.Navigation("SyncOperations");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.EcommerceStore", b =>
+                {
+                    b.Navigation("Orders");
                 });
 
             modelBuilder.Entity("CALAC.Domain.Entities.GoodsReceipt", b =>
@@ -1744,6 +2730,11 @@ namespace CALAC.Infrastructure.Migrations
                     b.Navigation("AuditLogs");
 
                     b.Navigation("Devices");
+                });
+
+            modelBuilder.Entity("CALAC.Domain.Entities.WorkOrder", b =>
+                {
+                    b.Navigation("Consumptions");
                 });
 #pragma warning restore 612, 618
         }

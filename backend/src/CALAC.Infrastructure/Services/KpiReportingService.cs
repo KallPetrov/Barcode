@@ -1,5 +1,4 @@
 using CALAC.Domain.Entities;
-using CALAC.Domain.Enums;
 using CALAC.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,28 +24,6 @@ public class KpiReportingService(AppDbContext db)
             .DefaultIfEmpty(0)
             .Average();
 
-        var stockLines = await db.PickingStockLines.Where(x => x.TenantId == tenantId).ToListAsync(ct);
-        var totalOverrideCount = stockLines.Count(x => x.IsOverride);
-        var complianceRate = stockLines.Count == 0 ? 100m : Math.Round((decimal)(stockLines.Count - totalOverrideCount) / stockLines.Count * 100m, 2);
-
-        var expiredStockValue = inventory.Where(x => x.Status == StockStatus.Expired).Sum(x => x.Quantity);
-        var quarantinedStockValue = inventory.Where(x => x.Status == StockStatus.Quarantined).Sum(x => x.Quantity);
-
-        var slowMovingThreshold = DateTime.UtcNow.AddMonths(-3);
-        var expiryRiskThreshold = DateTime.UtcNow.AddDays(30);
-
-        var slowMovingItems = inventory
-            .Where(s => s.Quantity > 0 && (!s.UpdatedAt.HasValue || s.UpdatedAt < slowMovingThreshold))
-            .GroupBy(s => s.ItemId)
-            .Select(g => new { ItemId = g.Key, Quantity = g.Sum(x => x.Quantity) })
-            .ToList();
-
-        var expiryRiskItems = inventory
-            .Where(s => s.Quantity > 0 && s.ExpiryDate.HasValue && s.ExpiryDate < expiryRiskThreshold)
-            .GroupBy(s => s.ItemId)
-            .Select(g => new { ItemId = g.Key, Quantity = g.Sum(x => x.Quantity) })
-            .ToList();
-
         return new
         {
             totalTasks,
@@ -58,13 +35,7 @@ public class KpiReportingService(AppDbContext db)
             totalPickings,
             pickingAccuracy,
             inventoryTurnover,
-            averageCompletionDays = Math.Round(avgCompletionDays, 2),
-            totalOverrideCount,
-            pickingComplianceRate = complianceRate,
-            expiredStockQuantity = expiredStockValue,
-            quarantinedStockQuantity = quarantinedStockValue,
-            slowMovingItemCount = slowMovingItems.Count,
-            expiryRiskItemCount = expiryRiskItems.Count
+            averageCompletionDays = Math.Round(avgCompletionDays, 2)
         };
     }
 }
