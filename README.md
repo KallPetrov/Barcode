@@ -1,15 +1,17 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.37.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.38.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
+![.NET](https://img.shields.io/badge/.NET-10.0%20LTS-512bd4.svg)
+![React](https://img.shields.io/badge/React-19-61dafb.svg)
 
-**CALAC** е модулна WMS/warehouse execution платформа за складове, 3PL оператори и e-commerce fulfillment центрове. Към момента проектът е надграден от базовия прототип до работеща backend-ориентирана система с реални складови процеси, интеграции и SaaS подготовка.
+**CALAC** е модерна, модулна WMS/warehouse execution платформа от ново поколение, проектирана за складове, 3PL оператори и e-commerce fulfillment центрове. Системата предлага висока мащабируемост, offline-first мобилна работа и дълбока интеграция с водещи ERP и e-commerce платформи.
 
 ---
 
-## 📌 Текущо състояние (2026-07-20)
+## 📌 Текущо състояние (2026-07-23)
 
 CALAC вече включва:
 - **мулти-тенант сигурност** с JWT, refresh tokens, RBAC и audit log;
@@ -18,6 +20,45 @@ CALAC вече включва:
 - **интеграционен слой** — webhooks, partner API ключове, ERP-ориентирана структура и SignalR нотификации;
 - **SaaS readiness** — self-service onboarding и активиране на tenant subscription plan;
 - **оперативна инфраструктура** — OpenTelemetry, Docker, PWA admin panel и ZPL/Labelary поддръжка.
+
+---
+
+## 🏗️ Архитектура
+
+```mermaid
+flowchart TB
+    subgraph Clients
+        Admin[Admin Panel<br/>React + Vite]
+        PDA[Mobile App<br/>Kotlin Android]
+    end
+
+    subgraph Backend [CALAC API - .NET 10 LTS]
+        Core[Domain & Business Logic]
+        Sync[Offline Sync Engine<br/>Last-Write-Wins]
+        Auth[Security Layer<br/>JWT + PIN Lockout]
+    end
+
+    subgraph Storage
+        DB[(PostgreSQL / SQLite)]
+        Redis[(Redis Cache)]
+    end
+
+    subgraph Integrations
+        ERP[ERP Adapters<br/>Odoo / Dynamics]
+        Ecom[E-commerce<br/>Shopify / WooCommerce]
+        Log[Logistics<br/>Econt / Speedy]
+        Stripe[Payments<br/>Stripe SaaS]
+    end
+
+    Admin <--> Auth
+    PDA <--> Auth
+    Auth --> Core
+    Core <--> DB
+    Core <--> Redis
+    Core <--> Integrations
+    PDA <--> Sync
+    Sync <--> DB
+```
 
 ---
 

@@ -19,8 +19,8 @@ public class SmokeTests : IClassFixture<WebApplicationFactory<Program>>
         {
             builder.ConfigureServices(services =>
             {
-                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
-                if (descriptor != null) services.Remove(descriptor);
+                var descriptors = services.Where(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>) || d.ServiceType.Name.Contains("IDbContextOptions")).ToList();
+                foreach (var d in descriptors) services.Remove(d);
 
                 services.AddDbContext<AppDbContext>(options =>
                 {
