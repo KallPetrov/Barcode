@@ -115,7 +115,29 @@ export function ItemsPage() {
           <label>Име<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label>Описание<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
           <label>Баркод<input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></label>
-          <label>Тип баркод<input value={form.barcodeType} onChange={(e) => setForm({ ...form, barcodeType: e.target.value })} /></label>
+          <label>Тип баркод
+            <select value={form.barcodeType} onChange={(e) => setForm({ ...form, barcodeType: e.target.value })}>
+              <option value="Unknown">Unknown</option>
+              <option value="Upc">UPC CODE</option>
+              <option value="Ean">EAN CODE</option>
+              <option value="Code39">CODE 39</option>
+              <option value="Code128">CODE 128</option>
+              <option value="Itf">ITF (Interleaved 2 of 5)</option>
+              <option value="Code93">CODE 93</option>
+              <option value="Codabar">CODABAR</option>
+              <option value="Gs1DataBar">GS1 DATABAR</option>
+              <option value="MsiPlessey">MSI PLESSEY</option>
+              <option value="Codablock">CODABLOCK</option>
+              <option value="QrCode">QR CODE</option>
+              <option value="DataMatrix">DATAMATRIX CODE</option>
+              <option value="Pdf417">PDF417</option>
+              <option value="Aztec">AZTEC</option>
+              <option value="MaxiCode">MAXICODE</option>
+              <option value="HanXin">HAN XIN CODE</option>
+              <option value="DotCode">DOTCODE</option>
+              <option value="Gs1128">GS1-128</option>
+            </select>
+          </label>
           <label>Снимка URL<input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} /></label>
           <label>Тегло (кг)<input type="number" step="0.001" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} /></label>
           <label>Мярка<input value={form.unitOfMeasure} onChange={(e) => setForm({ ...form, unitOfMeasure: e.target.value })} /></label>

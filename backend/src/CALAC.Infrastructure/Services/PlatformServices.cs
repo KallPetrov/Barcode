@@ -994,7 +994,7 @@ public class LocationService(AppDbContext db, AuditService audit)
 public record CreateLocationRequest(string Code, string Name, string? Zone, string? Aisle, string? Rack, string? Level, string? Position);
 public record UpdateLocationRequest(string Code, string Name, string? Zone, string? Aisle, string? Rack, string? Level, string? Position, bool IsActive);
 
-public record ItemDto(Guid Id, string Sku, string Name, string? Description, string? Barcode, string? BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, bool IsActive, DateTime CreatedAt, string? DefaultPickingStrategy = "FIFO", int? MinShelfLifeDays = null);
+public record ItemDto(Guid Id, string Sku, string Name, string? Description, string? Barcode, BarcodeSymbology BarcodeType, string? ImageUrl, decimal? Weight, string? UnitOfMeasure, bool IsActive, DateTime CreatedAt, string? DefaultPickingStrategy = "FIFO", int? MinShelfLifeDays = null);
 public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
 
 public class ItemService(AppDbContext db, AuditService audit)
@@ -1052,11 +1052,11 @@ public class ItemService(AppDbContext db, AuditService audit)
             Name = request.Name,
             Description = request.Description,
             Barcode = request.Barcode,
-            BarcodeType = request.BarcodeType,
+            BarcodeType = (!string.IsNullOrEmpty(request.BarcodeType) && Enum.TryParse<BarcodeSymbology>(request.BarcodeType, true, out var symbology)) ? symbology : BarcodeSymbology.Unknown,
             ImageUrl = request.ImageUrl,
             Weight = request.Weight,
             UnitOfMeasure = request.UnitOfMeasure,
-            DefaultPickingStrategy = string.IsNullOrEmpty(request.DefaultPickingStrategy) ? PickingStrategy.FIFO : Enum.Parse<PickingStrategy>(request.DefaultPickingStrategy, true),
+            DefaultPickingStrategy = (!string.IsNullOrEmpty(request.DefaultPickingStrategy) && Enum.TryParse<PickingStrategy>(request.DefaultPickingStrategy, true, out var strategy)) ? strategy : PickingStrategy.FIFO,
             MinShelfLifeDays = request.MinShelfLifeDays,
             IsActive = true
         };
@@ -1082,12 +1082,19 @@ public class ItemService(AppDbContext db, AuditService audit)
         item.Name = request.Name;
         item.Description = request.Description;
         item.Barcode = request.Barcode;
-        item.BarcodeType = request.BarcodeType;
+        if (!string.IsNullOrEmpty(request.BarcodeType) && Enum.TryParse<BarcodeSymbology>(request.BarcodeType, true, out var symbology))
+        {
+            item.BarcodeType = symbology;
+        }
+        else
+        {
+            item.BarcodeType = BarcodeSymbology.Unknown;
+        }
         item.ImageUrl = request.ImageUrl;
         item.Weight = request.Weight;
         item.UnitOfMeasure = request.UnitOfMeasure;
-        if (!string.IsNullOrEmpty(request.DefaultPickingStrategy))
-            item.DefaultPickingStrategy = Enum.Parse<PickingStrategy>(request.DefaultPickingStrategy, true);
+        if (!string.IsNullOrEmpty(request.DefaultPickingStrategy) && Enum.TryParse<PickingStrategy>(request.DefaultPickingStrategy, true, out var pickingStrategy))
+            item.DefaultPickingStrategy = pickingStrategy;
         item.MinShelfLifeDays = request.MinShelfLifeDays;
         item.IsActive = request.IsActive;
 

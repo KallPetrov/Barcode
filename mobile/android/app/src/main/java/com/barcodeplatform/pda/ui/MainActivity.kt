@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import com.barcodeplatform.pda.CalacApp
 import com.barcodeplatform.pda.databinding.ActivityMainBinding
 import com.barcodeplatform.pda.scanner.DataWedgeReceiver
+import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -23,7 +24,8 @@ class MainActivity : AppCompatActivity() {
     private val scanReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val barcode = intent?.getStringExtra(DataWedgeReceiver.EXTRA_BARCODE) ?: return
-            onBarcodeScanned(barcode)
+            val symbology = intent.getStringExtra(DataWedgeReceiver.EXTRA_SYMBOLOGY) ?: "Unknown"
+            onBarcodeScanned(barcode, symbology)
         }
     }
 
@@ -63,12 +65,16 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    private fun onBarcodeScanned(barcode: String) {
+    private fun onBarcodeScanned(barcode: String, symbology: String) {
         vibrateSuccess()
-        binding.txtLastScan.text = barcode
+        binding.txtLastScan.text = "$barcode ($symbology)"
         binding.txtSyncStatus.text = "Статус: Сканиран баркод, записване в локалната опашка"
         lifecycleScope.launch {
-            repo.queueOperation("BARCODE_SCAN", """{"barcode":"$barcode"}""")
+            val payload = JsonObject().apply {
+                addProperty("barcode", barcode)
+                addProperty("symbology", symbology)
+            }.toString()
+            repo.queueOperation("BARCODE_SCAN", payload)
             refreshPendingCount()
             syncNow(showToast = false)
         }
