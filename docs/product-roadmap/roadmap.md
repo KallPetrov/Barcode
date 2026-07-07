@@ -3,15 +3,19 @@
 ## Визия
 CALAC да се развие в модулна WMS/warehouse execution платформа за складове, 3PL оператори и e-commerce fulfillment центрове, с възможност за SaaS доставка и по-широка интеграция с бизнес процеси.
 
-## Текущо състояние (2026-07-20)
+## Текущо състояние (2026-07-22)
 
 ### ✅ Завършено
 - Основен backend за складови операции: локации, артикули, приемане, трансфери, picking, задачи.
-- Multi-tenancy, JWT, RBAC и audit log.
+- FIFO, FEFO, LIFO и FPFO стратегии за ротация на стока.
+- Партидно управление с проследяване на дати (производство, годност, прием).
+- GS1-128 баркод интеграция.
+- Пълна проследимост (Genealogy) и производствени поръчки (BOM).
+- Multi-tenancy, JWT, RBAC и audit log с температурно проследяване.
 - Planned cycle counting по зона/категория.
 - Batch/wave picking.
 - Forecasting за нива на наличности.
-- Expiry alerts и защита от дублиране.
+- Expiry alerts и защита от дублиране с управление на статуси (Active/Expired).
 - Webhook subscriptions и partner API ключове.
 - Self-service tenant onboarding и базово active subscription plan управление.
 - Tenant branding configuration за white-label персонализация.

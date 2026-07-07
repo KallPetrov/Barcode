@@ -69,6 +69,7 @@ public class AuditLog : ITenantEntity
     public Guid? UserId { get; set; }
     public Guid? DeviceId { get; set; }
     public string Action { get; set; } = string.Empty;
+    public decimal? TemperatureCelsius { get; set; }
     public string? EntityType { get; set; }
     public string? EntityId { get; set; }
     public string? Details { get; set; }
@@ -219,14 +220,55 @@ public class WorkOrderConsumption : ITenantEntity
     public Guid WorkOrderId { get; set; }
     public Guid ComponentItemId { get; set; }
     public Guid InventoryStockId { get; set; } // The specific batch/location consumed
+    public Guid? ProducedInventoryStockId { get; set; } // Link to the finished product stock record
     public decimal Quantity { get; set; }
     public DateTime ConsumedAt { get; set; } = DateTime.UtcNow;
 
     public Tenant Tenant { get; set; } = null!;
     public WorkOrder WorkOrder { get; set; } = null!;
     public InventoryStock InventoryStock { get; set; } = null!;
-    public Guid? ProducedInventoryStockId { get; set; } // Link to the finished product stock record
     public InventoryStock? ProducedInventoryStock { get; set; }
+}
+
+public enum ReturnOrderStatus
+{
+    Draft = 0,
+    Received = 1,
+    Inspected = 2,
+    Restocked = 3,
+    Cancelled = 4
+}
+
+public class ReturnOrder : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string ReturnNumber { get; set; } = string.Empty;
+    public string? OriginalOrderReference { get; set; }
+    public string? CustomerName { get; set; }
+    public ReturnOrderStatus Status { get; set; } = ReturnOrderStatus.Draft;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Tenant Tenant { get; set; } = null!;
+    public ICollection<ReturnOrderLine> Lines { get; set; } = [];
+}
+
+public class ReturnOrderLine : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid ReturnOrderId { get; set; }
+    public Guid ItemId { get; set; }
+    public decimal Quantity { get; set; }
+    public string? BatchNumber { get; set; }
+    public string? SerialNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public string? Reason { get; set; }
+    public bool ShouldRestock { get; set; } = true;
+
+    public Tenant Tenant { get; set; } = null!;
+    public ReturnOrder ReturnOrder { get; set; } = null!;
+    public Item Item { get; set; } = null!;
 }
 
 public class CourierConfiguration : ITenantEntity
@@ -627,6 +669,7 @@ public class TransferOrder : ITenantEntity
     public DateTime? MovedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Notes { get; set; }
+    public decimal? MinRemainingShelfLifePercentage { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Tenant Tenant { get; set; } = null!;

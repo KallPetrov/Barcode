@@ -13,6 +13,14 @@ public class ManufacturingController(ManufacturingService manufacturingService) 
     private Guid TenantId => Guid.Parse(User.FindFirstValue("tenant_id")!);
     private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub")!);
 
+    [HttpPost("boms")]
+    [Authorize(Roles = "Admin,Supervisor")]
+    public async Task<IActionResult> CreateBom([FromBody] CreateBomRequest request)
+    {
+        await manufacturingService.CreateBomAsync(TenantId, request, UserId);
+        return Ok();
+    }
+
     [HttpPost("work-orders")]
     [Authorize(Roles = "Admin,Supervisor")]
     public async Task<ActionResult<WorkOrderDto>> CreateWorkOrder([FromBody] CreateWorkOrderRequest request)

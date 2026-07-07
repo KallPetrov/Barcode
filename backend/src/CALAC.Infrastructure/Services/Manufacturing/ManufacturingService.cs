@@ -11,6 +11,34 @@ public record WorkOrderDto(Guid Id, string OrderNumber, string Status, decimal P
 
 public class ManufacturingService(AppDbContext db, AuditService audit, InventoryService inventory)
 {
+    public async Task CreateBomAsync(Guid tenantId, CreateBomRequest request, Guid userId, CancellationToken ct = default)
+    {
+        var bom = new BillOfMaterial
+        {
+            TenantId = tenantId,
+            FinishedItemId = request.FinishedItemId,
+            Name = request.Name,
+            FinishedQuantity = request.FinishedQuantity
+        };
+
+        db.BillOfMaterials.Add(bom);
+        await db.SaveChangesAsync(ct);
+
+        foreach (var line in request.Lines)
+        {
+            db.BomLines.Add(new BomLine
+            {
+                TenantId = tenantId,
+                BillOfMaterialId = bom.Id,
+                ComponentItemId = line.ComponentItemId,
+                Quantity = line.Quantity
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        await audit.LogAsync(tenantId, "BOM_CREATED", userId, null, "BillOfMaterial", bom.Id.ToString(), $"Name={bom.Name}", null, ct);
+    }
+
     public async Task<WorkOrderDto> CreateWorkOrderAsync(Guid tenantId, Guid bomId, decimal quantity, Guid userId, CancellationToken ct = default)
     {
         var bom = await db.BillOfMaterials.FirstOrDefaultAsync(b => b.Id == bomId && b.TenantId == tenantId, ct)
