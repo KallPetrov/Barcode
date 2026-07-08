@@ -98,6 +98,7 @@ builder.Services.AddScoped<TenantOnboardingService>();
 builder.Services.AddScoped<PartnerApiKeyService>();
 builder.Services.AddScoped<ForecastingService>();
 builder.Services.AddScoped<BatchPickingService>();
+builder.Services.AddScoped<CALAC.Infrastructure.Services.Analytics.AnomalyDetectionService>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<TenantBrandingService>();

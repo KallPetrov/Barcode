@@ -42,9 +42,10 @@ public class OutboxProcessor(IServiceProvider serviceProvider, ILogger<OutboxPro
         {
             try
             {
-                // In a real scenario, this would publish to RabbitMQ or trigger webhooks
-                // For now, we just mark as processed to demonstrate the pattern
                 logger.LogInformation("Processing outbox message {MessageId} of type {Type}", message.Id, message.Type);
+
+                // Simulate dispatching to different handlers based on message type
+                await SimulateDispatchAsync(message, ct);
 
                 message.ProcessedAt = DateTime.UtcNow;
             }
@@ -59,5 +60,24 @@ public class OutboxProcessor(IServiceProvider serviceProvider, ILogger<OutboxPro
         {
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    private async Task SimulateDispatchAsync(OutboxMessage message, CancellationToken ct)
+    {
+        // This simulates what a real dispatcher (MediatR or custom) would do
+        switch (message.Type)
+        {
+            case "StockUpdated":
+                logger.LogDebug("Syncing stock change to external ERP via IEcommerceAdapter...");
+                break;
+            case "GoodsReceiptCompleted":
+                logger.LogDebug("Notifying external Logistics Hub of new stock arrivals...");
+                break;
+            default:
+                logger.LogDebug("Generic message dispatch for {Type}", message.Type);
+                break;
+        }
+
+        await Task.Delay(50, ct); // Simulate I/O
     }
 }
