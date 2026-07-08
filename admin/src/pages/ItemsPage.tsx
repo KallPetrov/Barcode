@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createItem, getItems, updateItem, deleteItem, type Item } from '../api/client';
 import { LabelModal } from '../components/LabelModal';
 
 export function ItemsPage() {
-  const [items, setItems] = useState<Item[]>([]);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -20,8 +21,51 @@ export function ItemsPage() {
   const [error, setError] = useState('');
   const [printId, setPrintId] = useState<string | null>(null);
 
-  const load = () => getItems().then(setItems);
-  useEffect(() => { load(); }, []);
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ['items'],
+    queryFn: getItems,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: createItem,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      setShowForm(false);
+      resetForm();
+    },
+    onError: () => setError('Грешка при създаване на артикул'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) => updateItem(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      setShowForm(false);
+      setEditingId(null);
+      resetForm();
+    },
+    onError: () => setError('Грешка при редактиране на артикул'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteItem,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['items'] }),
+    onError: () => setError('Грешка при изтриване на артикул'),
+  });
+
+  const resetForm = () => {
+    setForm({
+      sku: '',
+      name: '',
+      description: '',
+      barcode: '',
+      barcodeType: 'Unknown',
+      imageUrl: '',
+      weight: '',
+      unitOfMeasure: '',
+      isActive: true,
+    });
+  };
 
   const handleEdit = (item: Item) => {
     setEditingId(item.id);
@@ -41,44 +85,21 @@ export function ItemsPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Сигурни ли сте, че искате да изтриете този артикул?')) {
-      try {
-        await deleteItem(id);
-        await load();
-      } catch {
-        setError('Грешка при изтриване на артикул');
-      }
+      deleteMutation.mutate(id);
     }
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    try {
-      const payload = {
-        ...form,
-        weight: form.weight ? parseFloat(form.weight) : undefined,
-      };
-      if (editingId) {
-        await updateItem(editingId, payload);
-      } else {
-        await createItem(payload);
-      }
-      setShowForm(false);
-      setEditingId(null);
-      setForm({
-        sku: '',
-        name: '',
-        description: '',
-        barcode: '',
-        barcodeType: '',
-        imageUrl: '',
-        weight: '',
-        unitOfMeasure: '',
-        isActive: true,
-      });
-      await load();
-    } catch {
-      setError(editingId ? 'Грешка при редактиране на артикул' : 'Грешка при създаване на артикул');
+    const payload = {
+      ...form,
+      weight: form.weight ? parseFloat(form.weight) : undefined,
+    };
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, payload });
+    } else {
+      createMutation.mutate(payload);
     }
   };
 
@@ -92,17 +113,7 @@ export function ItemsPage() {
         <button type="button" onClick={() => {
           setShowForm(!showForm);
           setEditingId(null);
-          setForm({
-            sku: '',
-            name: '',
-            description: '',
-            barcode: '',
-            barcodeType: '',
-            imageUrl: '',
-            weight: '',
-            unitOfMeasure: '',
-            isActive: true,
-          });
+          resetForm();
         }}>
           {showForm ? 'Отказ' : '+ Нов артикул'}
         </button>
@@ -149,7 +160,9 @@ export function ItemsPage() {
         </form>
       )}
 
-      {items.length === 0 ? (
+      {isLoading ? (
+        <div className="panel empty">Зареждане...</div>
+      ) : items.length === 0 ? (
         <div className="panel empty">Няма създадени артикули</div>
       ) : (
         <table className="data-table">

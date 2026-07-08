@@ -1,7 +1,7 @@
 # <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/barcode.svg" width="48" height="48" /> CALAC
 
 ![CALAC CI](https://github.com/calac/platform/actions/workflows/build.yml/badge.svg)
-![Version](https://img.shields.io/badge/версия-0.39.0-blue.svg)
+![Version](https://img.shields.io/badge/версия-0.40.0-blue.svg)
 ![License](https://img.shields.io/badge/лиценз-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/платформа-Android%20%7C%20Web%20%7C%20API-lightgrey.svg)
 ![.NET](https://img.shields.io/badge/.NET-10.0%20LTS-512bd4.svg)
@@ -66,8 +66,8 @@ flowchart TB
 
 | Компонент | Технологии |
 |-----------|------------|
-| **Backend** | .NET 8, C#, ASP.NET Core Web API, EF Core, PostgreSQL/SQLite, JWT, SignalR |
-| **Admin Panel** | React, TypeScript, Vite, PWA |
+| **Backend** | .NET 10 (LTS), C#, ASP.NET Core Web API, EF Core, PostgreSQL/SQLite, JWT, SignalR |
+| **Admin Panel** | React 19, TypeScript, Vite, PWA, TanStack Query |
 | **Mobile Application** | Kotlin, Android, PDA-ready workflow |
 | **Infrastructure** | Docker, OpenTelemetry, Prometheus, GitHub Actions |
 
@@ -79,23 +79,30 @@ flowchart TB
 - JWT автентикация и refresh token ротация
 - RBAC за Admin, Supervisor и Operator
 - Multi-tenancy с EF Core Global Filters
-- Audit log и Device Lockout защита
-- Задължителна смяна на парола и Rate Limiting защита
+- Audit log (Immutable) и Device Lockout (PIN) защита
+- Задължителна смяна на парола и Rate Limiting
+- PII Encryption (Криптиране на лични данни за пратки)
 
 ### 🏗️ Складови процеси
 - Управление на локации и артикули
-- Goods receipt и internal transfers
-- Picking с FEFO/FIFO логика
+- Goods receipt и internal transfers с **Workflow Engine**
+- Picking с FEFO/FIFO/LIFO/FPFO логика
 - Управление на задачи и операторски workflow
 - Planned cycle counting по зона/категория
 - Batch и wave picking
 
-### 🔄 Интеграции и мониторинг
+### 🔄 Интеграции и Модернизация
 - ERP Адаптери (Odoo, Dynamics 365)
+- **Outbox Pattern** за надеждна интеграция
 - Webhook subscriptions и Partner API ключове
 - Real-time SignalR нотификации
+- **TanStack Query** за оптимизиран Admin UI
+- ZPL/Labelary и GS1-128 поддръжка (17+ симбологии)
+
+### 📊 Аналитика и Интелигентност
+- **Anomaly Detection** (Z-score статистически анализ на инвентара)
+- Forecasting за нива на наличности
 - OpenTelemetry & Prometheus мониторинг
-- ZPL/Labelary и GS1-128 поддръжка
 
 ### ☁️ SaaS подготовка
 - Self-service tenant onboarding
@@ -121,7 +128,7 @@ CALAC/
 
 ## 🛠️ Системни изисквания
 
-- Backend: .NET 8 SDK
+- Backend: .NET 10 SDK
 - Frontend: Node.js 20+ и npm
 - Database: PostgreSQL или SQLite за локално развитие
 - Mobile: Android Studio и PDA устройство

@@ -1,4 +1,5 @@
 using CALAC.Domain.Enums;
+using CALAC.Domain.Workflow;
 
 namespace CALAC.Domain.Entities;
 
@@ -618,7 +619,7 @@ public enum GoodsReceiptStatus
     Cancelled = 3
 }
 
-public class GoodsReceipt : ITenantEntity
+public class GoodsReceipt : ITenantEntity, IWorkflowState<GoodsReceiptStatus>
 {
     public Guid Id { get; set; }
     public Guid TenantId { get; set; }

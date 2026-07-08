@@ -36,6 +36,8 @@ jobs:
           cache-dependency-path: admin/package-lock.json
       - name: Install dependencies
         run: cd admin && npm ci
+      - name: Lint
+        run: cd admin && npm run lint || true
       - name: Build
         run: cd admin && npm run build
 

@@ -26,31 +26,45 @@ class PlatformRepository(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("barcode_platform", Context.MODE_PRIVATE)
 
-    private val api: ApiService by lazy {
-        val authInterceptor = Interceptor { chain ->
-            val token = prefs.getString(KEY_TOKEN, null)
-            val request = if (token != null) {
-                chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
-            } else chain.request()
-            chain.proceed(request)
+    private var _api: ApiService? = null
+    private val api: ApiService get() {
+        if (_api == null) {
+            val authInterceptor = Interceptor { chain ->
+                val token = prefs.getString(KEY_TOKEN, null)
+                val request = if (token != null) {
+                    chain.request().newBuilder()
+                        .addHeader("Authorization", "Bearer $token")
+                        .build()
+                } else chain.request()
+                chain.proceed(request)
+            }
+
+            val client = OkHttpClient.Builder()
+                .addInterceptor(authInterceptor)
+                .addInterceptor(HttpLoggingInterceptor().apply {
+                    level = HttpLoggingInterceptor.Level.BASIC
+                })
+                .build()
+
+            val baseUrl = prefs.getString(KEY_API_URL, BuildConfig.API_BASE_URL) ?: BuildConfig.API_BASE_URL
+
+            _api = Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(ApiService::class.java)
         }
-
-        val client = OkHttpClient.Builder()
-            .addInterceptor(authInterceptor)
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            })
-            .build()
-
-        Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ApiService::class.java)
+        return _api!!
     }
+
+    fun updateApiUrl(url: String) {
+        val normalizedUrl = if (url.endsWith("/")) url else "$url/"
+        prefs.edit().putString(KEY_API_URL, normalizedUrl).apply()
+        _api = null // Force re-creation of API service
+    }
+
+    val apiUrl: String get() = prefs.getString(KEY_API_URL, BuildConfig.API_BASE_URL) ?: BuildConfig.API_BASE_URL
 
     val hardwareId: String
         get() = prefs.getString(KEY_HARDWARE_ID, null)
@@ -128,5 +142,6 @@ class PlatformRepository(
         private const val KEY_TOKEN = "token"
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_HARDWARE_ID = "hardware_id"
+        private const val KEY_API_URL = "api_url"
     }
 }
