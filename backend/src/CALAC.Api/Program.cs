@@ -102,6 +102,7 @@ builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
 builder.Services.AddScoped<TenantBrandingService>();
 builder.Services.AddHttpClient<WebhookSubscriptionService>();
+builder.Services.AddHostedService<CALAC.Infrastructure.BackgroundServices.OutboxProcessor>();
 builder.Services.AddScoped<ILabelTemplateEngine, LabelTemplateEngine>();
 builder.Services.AddScoped<IZplService, ZplService>();
 builder.Services.AddScoped<ICourierAdapter, EcontAdapter>();

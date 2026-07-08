@@ -1380,19 +1380,71 @@ public class InventorySessionService(AppDbContext db, AuditService audit, Notifi
 
     public async Task<InventorySessionDto> CompleteAsync(Guid tenantId, Guid id, Guid userId, CancellationToken ct = default)
     {
-        var session = await db.InventorySessions.FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId, ct);
+        var session = await db.InventorySessions
+            .Include(s => s.InventoryCounts)
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId, ct);
+
         if (session is null)
             throw new KeyNotFoundException("Сесията не е намерена");
         if (session.Status != InventorySessionStatus.InProgress)
             throw new InvalidOperationException("Само сесии в статус InProgress могат да бъдат завършени");
 
+        // Process stock adjustments
+        foreach (var count in session.InventoryCounts)
+        {
+            if (!count.CountedQuantity.HasValue) continue;
+
+            var stock = await db.InventoryStocks.FirstOrDefaultAsync(s =>
+                s.TenantId == tenantId &&
+                s.ItemId == count.ItemId &&
+                s.LocationId == count.LocationId &&
+                s.BatchNumber == count.BatchNumber &&
+                s.SerialNumber == count.SerialNumber, ct);
+
+            if (stock != null)
+            {
+                if (stock.Quantity != count.CountedQuantity.Value)
+                {
+                    await audit.LogAsync(tenantId, "STOCK_ADJUSTMENT", userId, null, "InventoryStock", stock.Id.ToString(),
+                        $"Adjustment from {stock.Quantity} to {count.CountedQuantity.Value} for SKU {count.ItemId}", null, ct);
+
+                    stock.Quantity = count.CountedQuantity.Value;
+                    stock.UpdatedAt = DateTime.UtcNow;
+                    stock.Version++;
+                }
+            }
+            else if (count.CountedQuantity.Value > 0)
+            {
+                // Create new stock entry if it doesn't exist but was counted
+                var newStock = new InventoryStock
+                {
+                    TenantId = tenantId,
+                    ItemId = count.ItemId,
+                    LocationId = count.LocationId,
+                    Quantity = count.CountedQuantity.Value,
+                    BatchNumber = count.BatchNumber,
+                    SerialNumber = count.SerialNumber,
+                    ExpiryDate = count.ExpiryDate,
+                    ProductionDate = count.ProductionDate,
+                    BestBeforeDate = count.BestBeforeDate,
+                    Status = StockStatus.Active,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                db.InventoryStocks.Add(newStock);
+
+                await audit.LogAsync(tenantId, "STOCK_CREATED_BY_COUNT", userId, null, "InventoryStock", newStock.Id.ToString(),
+                    $"New stock created via inventory session for SKU {count.ItemId}", null, ct);
+            }
+        }
+
         session.Status = InventorySessionStatus.Completed;
         session.CompletedAt = DateTime.UtcNow;
+        session.CompletedByUserId = userId;
 
         await db.SaveChangesAsync(ct);
         await audit.LogAsync(tenantId, "SESSION_COMPLETED", userId, null, "InventorySession", session.Id.ToString(),
             null, null, ct);
-        await alerts.CreateAsync(tenantId, "Инвентаризация завършена", $"Сесията '{session.Name}' е завършена.", AlertLevel.Info, userId, ct);
+        await alerts.CreateAsync(tenantId, "Инвентаризация завършена", $"Сесията '{session.Name}' е завършена и наличностите са обновени.", AlertLevel.Info, userId, ct);
 
         if (hubContext?.Clients != null)
         {
