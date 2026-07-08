@@ -62,6 +62,19 @@ public class Device : ITenantEntity
     public ICollection<AuditLog> AuditLogs { get; set; } = [];
 }
 
+public class OutboxMessage : ITenantEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ProcessedAt { get; set; }
+    public string? Error { get; set; }
+
+    public Tenant Tenant { get; set; } = null!;
+}
+
 public class AuditLog : ITenantEntity
 {
     public Guid Id { get; set; }

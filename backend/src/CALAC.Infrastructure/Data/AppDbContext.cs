@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Device> Devices => Set<Device>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SyncOperation> SyncOperations => Set<SyncOperation>();
     public DbSet<Location> Locations => Set<Location>();
@@ -108,6 +109,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantService
             e.Property(x => x.Model).HasMaxLength(100);
             e.HasOne(x => x.Tenant).WithMany(t => t.Devices).HasForeignKey(x => x.TenantId);
             e.HasOne(x => x.AssignedUser).WithMany(u => u.Devices).HasForeignKey(x => x.AssignedUserId);
+        });
+
+        modelBuilder.Entity<OutboxMessage>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.TenantId, x.ProcessedAt });
+            e.Property(x => x.Type).HasMaxLength(200);
+            e.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantId);
         });
 
         modelBuilder.Entity<AuditLog>(e =>

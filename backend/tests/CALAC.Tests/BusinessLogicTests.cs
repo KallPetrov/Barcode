@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.DataProtection;
 using CALAC.Infrastructure.Services.Logistics;
 using System.Net;
 using System.Net.Http;
@@ -64,7 +65,9 @@ public class BusinessLogicTests
         clients.Setup(c => c.Group(It.IsAny<string>())).Returns(group.Object);
 
         var shippingLogger = new Mock<ILogger<ShippingService>>();
-        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
+        var dataProtection = new Mock<IDataProtectionProvider>();
+        dataProtection.Setup(p => p.CreateProtector(Moq.It.IsAny<string>())).Returns(new Mock<IDataProtector>().Object);
+        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>(), dataProtection.Object);
         var service = new PickingService(db, audit, alerts, hub.Object, shippingService);
         var tenantId = Guid.NewGuid();
         var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-1", Name = "Item 1" };
@@ -95,7 +98,9 @@ public class BusinessLogicTests
         var alerts = new Mock<NotificationAlertService>(db, audit.Object, sp);
         var hub = new Mock<IHubContext<DynamicHubProxy>>();
         var shippingLogger = new Mock<ILogger<ShippingService>>();
-        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
+        var dataProtection = new Mock<IDataProtectionProvider>();
+        dataProtection.Setup(p => p.CreateProtector(Moq.It.IsAny<string>())).Returns(new Mock<IDataProtector>().Object);
+        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>(), dataProtection.Object);
         var service = new PickingService(db, audit.Object, alerts.Object, hub.Object, shippingService);
 
         var tenantId = Guid.NewGuid();
@@ -439,7 +444,9 @@ public class BusinessLogicTests
         var alerts = new Mock<NotificationAlertService>(db, audit.Object, sp);
         var hub = new Mock<IHubContext<DynamicHubProxy>>();
         var shippingLogger = new Mock<ILogger<ShippingService>>();
-        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>());
+        var dataProtectionVal = new Mock<IDataProtectionProvider>();
+        dataProtectionVal.Setup(p => p.CreateProtector(Moq.It.IsAny<string>())).Returns(new Mock<IDataProtector>().Object);
+        var shippingService = new ShippingService(db, shippingLogger.Object, Enumerable.Empty<ICourierAdapter>(), dataProtectionVal.Object);
         var service = new PickingService(db, audit.Object, alerts.Object, hub.Object, shippingService);
 
         var tenantId = Guid.NewGuid();
@@ -505,6 +512,39 @@ public class BusinessLogicTests
         // Assert
         var stock = await db.InventoryStocks.FirstAsync(s => s.ItemId == item.Id);
         Assert.Equal(15, stock.Quantity); // 10 + 5
+    }
+
+    [Fact]
+    public async Task InventorySessionService_Complete_AdjustsStock()
+    {
+        // Arrange
+        using var db = CreateDbContext();
+        var audit = new AuditService(db);
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var alerts = new NotificationAlertService(db, audit, sp);
+        var hub = new Mock<IHubContext<DynamicHubProxy>>();
+        var service = new InventorySessionService(db, audit, alerts, hub.Object);
+
+        var tenantId = Guid.NewGuid();
+        var item = new Item { Id = Guid.NewGuid(), TenantId = tenantId, Sku = "SKU-COUNT", Name = "Item" };
+        var loc = new Location { Id = Guid.NewGuid(), TenantId = tenantId, Code = "L1", Name = "L1" };
+        db.Items.Add(item);
+        db.Locations.Add(loc);
+        db.InventoryStocks.Add(new InventoryStock { TenantId = tenantId, ItemId = item.Id, LocationId = loc.Id, Quantity = 10 });
+        await db.SaveChangesAsync();
+
+        var sessionDto = await service.CreateAsync(tenantId, new CreateSessionRequest("Session", ""), Guid.NewGuid());
+        await service.StartAsync(tenantId, sessionDto.Id, Guid.NewGuid());
+
+        var count = await db.InventoryCounts.FirstAsync(c => c.InventorySessionId == sessionDto.Id);
+        await service.UpdateCountAsync(tenantId, count.Id, new UpdateCountRequest(15), Guid.NewGuid());
+
+        // Act
+        await service.CompleteAsync(tenantId, sessionDto.Id, Guid.NewGuid());
+
+        // Assert
+        var stock = await db.InventoryStocks.FirstAsync(s => s.ItemId == item.Id);
+        Assert.Equal(15, stock.Quantity);
     }
 
     [Fact]

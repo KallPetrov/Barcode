@@ -10,4 +10,6 @@ public interface IExternalSyncProvider
     Task SyncInventoryAsync(CancellationToken ct = default);
     Task PushGoodsReceiptAsync(GoodsReceipt receipt, CancellationToken ct = default);
     Task PushTransferOrderAsync(TransferOrder transfer, CancellationToken ct = default);
+    Task PushPickingOrderAsync(PickingOrder picking, CancellationToken ct = default);
+    Task<IEnumerable<Item>> ImportItemsAsync(CancellationToken ct = default);
 }
