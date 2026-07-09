@@ -11,15 +11,21 @@ import android.os.Vibrator
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
 import com.barcodeplatform.pda.CalacApp
 import com.barcodeplatform.pda.databinding.ActivityMainBinding
 import com.barcodeplatform.pda.scanner.DataWedgeReceiver
+import com.barcodeplatform.pda.voice.VoiceCommandService
 import com.google.gson.JsonObject
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var repo: com.barcodeplatform.pda.data.repository.PlatformRepository
+    private var voiceCommandService: VoiceCommandService? = null
 
     private val scanReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -46,13 +52,56 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnSync.setOnClickListener { syncNow() }
-        binding.btnLogout.setOnClickListener {
-            repo.logout()
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
+        binding.btnLogout.setOnClickListener { logout() }
+
+        binding.btnVoiceCommand.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 101)
+            } else {
+                startVoiceRecognition()
+            }
         }
 
         refreshPendingCount()
+    }
+
+    private fun startVoiceRecognition() {
+        if (voiceCommandService == null) {
+            voiceCommandService = VoiceCommandService(this) { command ->
+                handleVoiceCommand(command)
+            }
+        }
+        voiceCommandService?.startListening()
+        Toast.makeText(this, "Слушам...", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun handleVoiceCommand(command: String) {
+        when {
+            command.contains("синхронизирай") || command.contains("изпрати") -> {
+                (application as CalacApp).voiceService.speak("Стартирам синхронизация")
+                syncNow()
+            }
+            command.contains("изход") || command.contains("отписване") -> {
+                logout()
+            }
+            command.contains("повтори") -> {
+                val lastScan = binding.txtLastScan.text.toString()
+                if (lastScan != "—") {
+                    (application as CalacApp).voiceService.speak("Последно сканиран: $lastScan")
+                } else {
+                    (application as CalacApp).voiceService.speak("Няма последно сканирани данни")
+                }
+            }
+            else -> {
+                (application as CalacApp).voiceService.speak("Непозната команда: $command")
+            }
+        }
+    }
+
+    private fun logout() {
+        (application as CalacApp).repository.logout()
+        startActivity(Intent(this, LoginActivity::class.java))
+        finish()
     }
 
     override fun onResume() {
@@ -68,7 +117,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         unregisterReceiver(scanReceiver)
+        voiceCommandService?.stopListening()
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        voiceCommandService?.destroy()
+        super.onDestroy()
     }
 
     private fun onBarcodeScanned(barcode: String, symbology: String) {
