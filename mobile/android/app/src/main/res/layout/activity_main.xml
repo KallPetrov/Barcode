@@ -61,13 +61,28 @@
         android:text="Статус: Готово за синхронизация"
         android:textSize="14sp" />
 
-    <CheckBox
-        android:id="@+id/cbVoiceEnabled"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Гласова обратна връзка"
-        android:checked="true" />
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp">
+
+        <CheckBox
+            android:id="@+id/cbVoiceEnabled"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Гласова обратна връзка"
+            android:checked="true" />
+
+        <ImageButton
+            android:id="@+id/btnVoiceCommand"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_btn_speak_now"
+            android:contentDescription="Гласова команда" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/btnSync"
