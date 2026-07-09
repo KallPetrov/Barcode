@@ -39,6 +39,12 @@ class MainActivity : AppCompatActivity() {
         binding.txtDeviceId.text = "ID: ${repo.hardwareId}"
         binding.txtSyncStatus.text = "Статус: Готово за синхронизация"
 
+        val voicePrefs = getSharedPreferences("voice_prefs", Context.MODE_PRIVATE)
+        binding.cbVoiceEnabled.isChecked = voicePrefs.getBoolean("voice_enabled", true)
+        binding.cbVoiceEnabled.setOnCheckedChangeListener { _, isChecked ->
+            voicePrefs.edit().putBoolean("voice_enabled", isChecked).apply()
+        }
+
         binding.btnSync.setOnClickListener { syncNow() }
         binding.btnLogout.setOnClickListener {
             repo.logout()
@@ -67,6 +73,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onBarcodeScanned(barcode: String, symbology: String) {
         vibrateSuccess()
+        (application as CalacApp).voiceService.speak("Артикулът е разпознат")
         binding.txtLastScan.text = "$barcode ($symbology)"
         binding.txtSyncStatus.text = "Статус: Сканиран баркод, записване в локалната опашка"
         lifecycleScope.launch {
@@ -99,6 +106,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 .onFailure {
+                    (application as CalacApp).voiceService.speak("Грешка при синхронизация")
                     binding.txtSyncStatus.text = "Статус: Офлайн — данните са запазени локално"
                     if (showToast) {
                         Toast.makeText(this@MainActivity, "Offline — данните са запазени локално", Toast.LENGTH_SHORT).show()
