@@ -134,6 +134,13 @@ class PlatformRepository(
 
     suspend fun pendingCount(): Int = syncDao.pendingCount()
 
+    suspend fun getPickingOrders() = runCatching { api.getPickingOrders() }
+    suspend fun getPickingOrder(id: String) = runCatching { api.getPickingOrder(id) }
+    suspend fun startPickingOrder(id: String) = runCatching { api.startPickingOrder(id) }
+    suspend fun completePickingOrder(id: String) = runCatching { api.completePickingOrder(id) }
+    suspend fun updatePickingLine(id: String, request: com.barcodeplatform.pda.data.api.UpdatePickingLineRequest) =
+        runCatching { api.updatePickingLine(id, request) }
+
     fun logout() {
         prefs.edit().clear().apply()
     }
