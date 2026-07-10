@@ -30,6 +30,18 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <activity
+            android:name=".ui.PickingListActivity"
+            android:exported="false"
+            android:label="Picking Списък"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".ui.PickingDetailActivity"
+            android:exported="false"
+            android:label="Picking Детайли"
+            android:screenOrientation="portrait" />
+
         <receiver
             android:name=".scanner.DataWedgeReceiver"
             android:exported="true">

@@ -51,6 +51,9 @@ class MainActivity : AppCompatActivity() {
             voicePrefs.edit().putBoolean("voice_enabled", isChecked).apply()
         }
 
+        binding.btnPicking.setOnClickListener {
+            startActivity(Intent(this, PickingListActivity::class.java))
+        }
         binding.btnSync.setOnClickListener { syncNow() }
         binding.btnLogout.setOnClickListener { logout() }
 
