@@ -524,8 +524,19 @@ public static class DbSeeder
             Role = UserRole.Operator
         };
 
+        var subscription = new TenantSubscription
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenant.Id,
+            PlanCode = "starter",
+            IsActive = true,
+            ExpiresAt = DateTime.UtcNow.AddYears(1),
+            CreatedAt = DateTime.UtcNow
+        };
+
         db.Tenants.Add(tenant);
         db.Users.AddRange(admin, operatorUser);
+        db.TenantSubscriptions.Add(subscription);
         await db.SaveChangesAsync();
     }
 }
